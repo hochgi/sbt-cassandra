@@ -19,7 +19,7 @@ object CassandraPlugin extends Plugin {
 	val startCassandra = TaskKey[File]("start-cassandra")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
 	
-	val ccmSettings = Seq(
+	val cassandraSettings = Seq(
 		cassandraConfigDir := defaultConfigDir,
 		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
@@ -28,7 +28,6 @@ object CassandraPlugin extends Plugin {
 			case (ver, targetDir) => { 
 				val jamm: File = targetDir / s"apache-cassandra-${ver}" / "lib" / "jamm-0.2.5.jar"
 				Seq("-server",
-					"-Duser.timezone=GMT0",
 					"-ea",
 					s"-javaagent:${jamm.getAbsolutePath}",
 					"-Xms1984M",
@@ -84,7 +83,7 @@ object CassandraPlugin extends Plugin {
 				}
 				val pid = s"-Dcassandra-pidfile=${pidFile.getAbsolutePath}"
 				println("[INFO] going to run cassandra:")
-				Process(Seq("java",pid) ++ jvmOpts ++ Seq("-cp",s"${conf}:${classpath}","org.apache.cassandra.service.CassandraDaemon"),cassHome, "CASSANDRA_CONF" -> conf).!
+				Process(Seq("java",pid) ++ jvmOpts ++ Seq("-cp",s"${conf}:${classpath}","org.apache.cassandra.service.CassandraDaemon"),cassHome, "CASSANDRA_CONF" -> conf).run
 				println("[INFO] going to wait for cassandra:")
 				waitForCassandra
 				println("[INFO] going to initialize cassandra:")
