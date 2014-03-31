@@ -58,7 +58,7 @@ or:
 ```scala
 cassandraJvmArgs ++= Seq(/* some additions that were not in the defaults */)
 ```
-**IMPORTANT NOTES**
+##### IMPORTANT NOTES #####
 Regarding the CQL commands, the file must contain `exit;` as the last line.
 your file might look something like:
 ```
@@ -68,6 +68,7 @@ create column family MoreData with ... ;
 exit;
 ```
 
-Regarding the JVM arguments:
+###### Regarding the JVM arguments: ######
 __don't add `-Dcassandra-pidfile=<file>` as this should be set via `cassandraConfigDir` key__ 
+
 the default arguments can be viewed [here](https://github.com/hochgi/sbt-cassandra-plugin/blob/master/src/main/scala/com/github/hochgi/sbt/cassandra/CassandraPlugin.scala#L30-L53).
