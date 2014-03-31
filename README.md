@@ -1,7 +1,7 @@
 sbt-cassandra-plugin
 ====================
 
-This is a work in progress project.  The goal is to allow launching [Cassandra](http://cassandra.apache.org) during tests, and test your application against it.
+This is a work in progress project.  The goal is to allow launching [Cassandra](http://cassandra.apache.org) during tests, and test your application against it (much like the [plugin for maven](http://mojo.codehaus.org/cassandra-maven-plugin)).
 at this pre-mature phase, only the very basic functionality works. API is not final, and might (probably will) change down the road.
 However, the plugin is already usable as is.
 
