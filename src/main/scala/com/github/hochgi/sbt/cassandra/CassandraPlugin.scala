@@ -14,51 +14,22 @@ object CassandraPlugin extends Plugin {
 	val cassandraConfigDir = SettingKey[String]("cassandra-config-dir")
 	val cassandraCliInit = SettingKey[String]("cassandra-cli-init")
 	val cassandraCqlInit = SettingKey[String]("cassandra-cql-init")
-	val cassandraJvmArgs = TaskKey[Seq[String]]("cassandra-jvm-args")
+	val cassandraHome = TaskKey[File]("cassandra-home")
 	val deployCassandra = TaskKey[File]("deploy-cassandra")
-	val startCassandra = TaskKey[File]("start-cassandra")
+	val startCassandra = TaskKey[sbt.Def.Setting[sbt.Task[String]]]("start-cassandra")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
 	
 	val cassandraSettings = Seq(
 		cassandraConfigDir := defaultConfigDir,
 		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
-		cassandraJvmArgs := Seq(),
-		cassandraJvmArgs <++= (cassandraVersion, target in Test) map {
-			case (ver, targetDir) => { 
-				val jamm: File = targetDir / s"apache-cassandra-${ver}" / "lib" / "jamm-0.2.5.jar"
-				Seq("-server",
-					"-ea",
-					s"-javaagent:${jamm.getAbsolutePath}",
-					"-Xms1984M",
-					"-Xmx1984M",
-					"-Xmn400M",
-					"-XX:+HeapDumpOnOutOfMemoryError",
-					"-Xss256k",
-					"-XX:StringTableSize=1000003",
-					"-XX:+UseParNewGC",
-					"-XX:+UseConcMarkSweepGC",
-					"-XX:+CMSParallelRemarkEnabled",
-					"-XX:SurvivorRatio=8",
-					"-XX:MaxTenuringThreshold=1",
-					"-XX:CMSInitiatingOccupancyFraction=75",
-					"-XX:+UseCMSInitiatingOccupancyOnly",
-					"-XX:+UseTLAB",
-					"-XX:+UseCondCardMark",
-					"-Djava.net.preferIPv4Stack=true",
-					"-Dcom.sun.management.jmxremote.port=7199",
-					"-Dcom.sun.management.jmxremote.ssl=false",
-					"-Dcom.sun.management.jmxremote.authenticate=false",
-					"-Dlog4j.configuration=log4j-server.properties",
-					"-Dlog4j.defaultInitOverride=true")
-			}
-		},
+		cassandraHome <<= (cassandraVersion, target) map {case (ver,targetDir) => targetDir / s"apache-cassandra-${ver}"},
 		cassandraVersion := "2.0.6",
 		classpathTypes ~=  (_ + "tar.gz"),
 		libraryDependencies += {
 			"org.apache.cassandra" % "apache-cassandra" % cassandraVersion.value artifacts(Artifact("apache-cassandra", "tar.gz", "tar.gz","bin")) intransitive()
 		},
-		deployCassandra <<= (cassandraVersion, target in Test, dependencyClasspath in Runtime) map {
+		deployCassandra <<= (cassandraVersion, target, dependencyClasspath in Runtime) map {
 			case (ver, targetDir, classpath) => {
 				val cassandraTarGz = Build.data(classpath).find(_.getName.endsWith(".tar.gz")).get
 				if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
@@ -67,11 +38,10 @@ object CassandraPlugin extends Plugin {
 				targetDir / s"apache-cassandra-${ver}"
 			}
 		},
-		startCassandra <<= (target, deployCassandra, cassandraJvmArgs, cassandraConfigDir,cassandraCliInit,cassandraCqlInit) map {
-			case (targetDir, cassHome, jvmOpts, confDirAsString, cli, cql) => {
+		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit) map {
+			case (targetDir, cassHome, confDirAsString, cli, cql) => {
 				val pidFile = targetDir / "cass.pid"
 				val jarClasspath = sbt.IO.listFiles(cassHome / "lib").collect{case f: File if f.getName.endsWith(".jar") => f.getAbsolutePath}.mkString(":")
-				val classpath = (cassHome / "conf").getAbsolutePath + ":" + jarClasspath
 				
 				val conf = {
 					if(confDirAsString == defaultConfigDir) {
@@ -81,21 +51,22 @@ object CassandraPlugin extends Plugin {
 						configDir.getAbsolutePath
 					} else confDirAsString
 				}
-				val pid = s"-Dcassandra-pidfile=${pidFile.getAbsolutePath}"
-				println("[INFO] going to run cassandra:")
-				Process(Seq("java",pid) ++ jvmOpts ++ Seq("-cp",s"${conf}:${classpath}","org.apache.cassandra.service.CassandraDaemon"),cassHome, "CASSANDRA_CONF" -> conf).run
+				val classpath = conf + ":" + jarClasspath
+				val bin = cassHome / "bin" / "cassandra"
+				val args = Seq(bin.getAbsolutePath, "-p", pidFile.getAbsolutePath)
+				Process(args,cassHome, "CASSANDRA_CONF" -> conf).run
 				println("[INFO] going to wait for cassandra:")
 				waitForCassandra
 				println("[INFO] going to initialize cassandra:")
 				initCassandra(cli,cql,classpath,cassHome)
-				pidFile
+				cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
 			}
 		},
 		cassandraPid <<= (target) map {
 			t => {
 				val cassPid = t / "cass.pid"
 				if(cassPid.exists) sbt.IO.read(cassPid).filterNot(_.isWhitespace)
-				else "NO-PID"
+				else "NO PID (did you run start-cassandra task?)"
 			}
 		}
 	)
