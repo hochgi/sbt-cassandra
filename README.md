@@ -34,9 +34,15 @@ libraryDependencies += "org.apache.cassandra" % "apache-cassandra" % "2.0.6"
 ```scala
 cassandraVersion <<= (libraryDependencies) (_.collect{case ModuleID("org.apache.cassandra","apache-cassandra",version,_,_,_,_,_,_,_,_) => version}.head)
 ```
-~~to stop cassandra after the tests finished, you could use:~~(currently not working)
+to stop cassandra after the tests finished and clean the data directory, you could use:
 ```scala
-testOptions in Test <+= (cassandraPid) map {pid => Tests.Cleanup(() => Process(Seq("kill",pid)).!)}
+testOptions in Test <+= (cassandraPid, cassandraHome) map {
+  case (pid, cassHome) => Tests.Cleanup(() => {
+    Process(Seq("kill",pid)).!
+    val data = (cassHome / "data").getAbsolutePath
+    Process(Seq("rm","-r",data)).!
+  })
+}
 ```
 to use special configuration files suited for your use case, use:
 ```scala
@@ -50,14 +56,7 @@ cassandraCliInit := "/path/to/cassandra-cli/commands/file"
 ```scala
 cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 ```
-to set specific JVM arguments, modify this however you want:
-```scala
-cassandraJvmArgs ~= (_.collect{/* some defaults you want to change */})
-```
-or:
-```scala
-cassandraJvmArgs ++= Seq(/* some additions that were not in the defaults */)
-```
+
 ##### IMPORTANT NOTES #####
 Regarding the CQL commands, the file must contain `exit;` as the last line.
 your file might look something like:
@@ -67,8 +66,3 @@ use Data;
 create column family MoreData with ... ;
 exit;
 ```
-
-###### Regarding the JVM arguments: ######
-__don't add `-Dcassandra-pidfile=<file>` as this should be set via `cassandraConfigDir` key__ 
-
-the default arguments can be viewed [here](https://github.com/hochgi/sbt-cassandra-plugin/blob/master/src/main/scala/com/github/hochgi/sbt/cassandra/CassandraPlugin.scala#L30-L53).
