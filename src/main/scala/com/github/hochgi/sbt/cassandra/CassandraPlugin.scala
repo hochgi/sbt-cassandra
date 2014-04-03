@@ -14,12 +14,16 @@ object CassandraPlugin extends Plugin {
 	val cassandraConfigDir = SettingKey[String]("cassandra-config-dir")
 	val cassandraCliInit = SettingKey[String]("cassandra-cli-init")
 	val cassandraCqlInit = SettingKey[String]("cassandra-cql-init")
+	val cassandraHost = SettingKey[String]("cassandra-host")
+	val cassandraPort = SettingKey[String]("cassandra-port")
 	val cassandraHome = TaskKey[File]("cassandra-home")
 	val deployCassandra = TaskKey[File]("deploy-cassandra")
 	val startCassandra = TaskKey[sbt.Def.Setting[sbt.Task[String]]]("start-cassandra")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
 	
 	val cassandraSettings = Seq(
+                cassandraHost := "localhost",
+                cassandraPort := "9160",
 		cassandraConfigDir := defaultConfigDir,
 		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
@@ -38,8 +42,8 @@ object CassandraPlugin extends Plugin {
 				targetDir / s"apache-cassandra-${ver}"
 			}
 		},
-		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit) map {
-			case (targetDir, cassHome, confDirAsString, cli, cql) => {
+		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit,cassandraHost,cassandraPort) map {
+			case (targetDir, cassHome, confDirAsString, cli, cql, host, port) => {
 				val pidFile = targetDir / "cass.pid"
 				val jarClasspath = sbt.IO.listFiles(cassHome / "lib").collect{case f: File if f.getName.endsWith(".jar") => f.getAbsolutePath}.mkString(":")
 				
@@ -58,7 +62,7 @@ object CassandraPlugin extends Plugin {
 				println("[INFO] going to wait for cassandra:")
 				waitForCassandra
 				println("[INFO] going to initialize cassandra:")
-				initCassandra(cli,cql,classpath,cassHome)
+				initCassandra(cli,cql,classpath,cassHome,host,port)
 				cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
 			}
 		},
@@ -102,14 +106,17 @@ object CassandraPlugin extends Plugin {
 			if (tr.isOpen) tr.close
 		}
 	}
-	def initCassandra(cli: String, cql: String, classpath: String, cassHome: File): Unit = {
+	def initCassandra(cli: String, cql: String, classpath: String, cassHome: File, host: String, port: String): Unit = {
 		if(cli != defaultCliInit && cql != defaultCqlInit) sys.error("use cli initiation commands, or cql initiation commands, but not both!")
 		else if(cli != defaultCliInit) {
-			Process(Seq("java","-ea","-cp",classpath,"-Xmx256M","-Dlog4j.configuration=log4j-tools.properties","org.apache.cassandra.cli.CliMain","-f",cli),
-					cassHome,"CASSANDRA_HOME" -> cassHome.getAbsolutePath).!
+			val bin = cassHome / "bin" / "cassandra-cli"
+			val args = Seq(bin.getAbsolutePath, "-f", cli,"-h",host,"-p",port)
+			Process(args,cassHome).!
 		}
 		else if(cql != defaultCqlInit) {
-			//TODO: use cql commands...
+			val bin = cassHome / "bin" / "cqlsh"
+			val args = Seq(bin.getAbsolutePath, "-f", cql,host,port)
+			Process(args,cassHome).!
 		}
 	}
 }
