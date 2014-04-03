@@ -38,9 +38,9 @@ to stop cassandra after the tests finished and clean the data directory, you cou
 ```scala
 testOptions in Test <+= (cassandraPid, cassandraHome) map {
   case (pid, cassHome) => Tests.Cleanup(() => {
-    Process(Seq("kill",pid)).!
+    s"kill $pid" !
     val data = (cassHome / "data").getAbsolutePath
-    Process(Seq("rm","-r",data)).!
+    s"rm -r $data" !
   })
 }
 ```
