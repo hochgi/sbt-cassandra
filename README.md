@@ -52,17 +52,10 @@ to intialize cassandra with your custom cassandra-cli commands, use:
 ```scala
 cassandraCliInit := "/path/to/cassandra-cli/commands/file"
 ```
-~~to intialize cassandra with your custom cql commands, use:~~(not implemented yet)
+to intialize cassandra with your custom cql commands, use:
 ```scala
 cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 ```
 
 ##### IMPORTANT NOTES #####
-Regarding the CQL commands, the file must contain `exit;` as the last line.
-your file might look something like:
-```
-create keyspace Data with ... ;
-use Data;
-create column family MoreData with ... ;
-exit;
-```
+don't use both CQL & CLI. shoose only one...
