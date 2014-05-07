@@ -2,6 +2,8 @@ package com.github.hochgi.sbt.cassandra
 
 import sbt._
 import Keys._
+import scala.concurrent._ ,duration._
+import ExecutionContext.Implicits.global
 
 object CassandraPlugin extends Plugin {
 	
@@ -19,14 +21,18 @@ object CassandraPlugin extends Plugin {
 	val cassandraHome = TaskKey[File]("cassandra-home")
 	val deployCassandra = TaskKey[File]("deploy-cassandra")
 	val startCassandra = TaskKey[sbt.Def.Setting[sbt.Task[String]]]("start-cassandra")
+	val stopCassandraAfterTests = SettingKey[Boolean]("stop-cassandra-after-tests")
+	val cleanCassandraAfterTests = SettingKey[Boolean]("clean-cassandra-after-tests")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
 	
 	val cassandraSettings = Seq(
-                cassandraHost := "localhost",
-                cassandraPort := "9160",
+        cassandraHost := "localhost",
+        cassandraPort := "9160",
 		cassandraConfigDir := defaultConfigDir,
 		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
+		stopCassandraAfterTests := true,
+		cleanCassandraAfterTests := true,
 		cassandraHome <<= (cassandraVersion, target) map {case (ver,targetDir) => targetDir / s"apache-cassandra-${ver}"},
 		cassandraVersion := "2.0.6",
 		classpathTypes ~=  (_ + "tar.gz"),
@@ -35,7 +41,7 @@ object CassandraPlugin extends Plugin {
 		},
 		deployCassandra <<= (cassandraVersion, target, dependencyClasspath in Runtime) map {
 			case (ver, targetDir, classpath) => {
-				val cassandraTarGz = Build.data(classpath).find(_.getName.endsWith(".tar.gz")).get
+				val cassandraTarGz = Build.data(classpath).find(_.getName == s"apache-cassandra-$ver-bin.tar.gz").get
 				if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
 				println(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
 				Process(Seq("tar","-xzf",cassandraTarGz.getAbsolutePath),targetDir).!
@@ -66,12 +72,39 @@ object CassandraPlugin extends Plugin {
 				cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
 			}
 		},
+		//if compilation of test classes fails, cassandra should not be invoked. (moreover, Test.Cleanup won't execute to stop it...)
+		startCassandra <<= (startCassandra).dependsOn(compile in Test),
 		cassandraPid <<= (target) map {
 			t => {
 				val cassPid = t / "cass.pid"
 				if(cassPid.exists) sbt.IO.read(cassPid).filterNot(_.isWhitespace)
-				else "NO PID (did you run start-cassandra task?)"
+				else "NO PID" // did you run start-cassandra task?
 			}
+		},//make sure to Stop cassandra when tests are done.
+		testOptions in Test <+= (cassandraPid, cassandraHome, stopCassandraAfterTests, cleanCassandraAfterTests) map {
+			case (pid, home, stop, clean) => Tests.Cleanup(() => {
+				if(stop && pid != "NO PID") {
+					s"kill $pid" !
+					//give cassandra a chance to exit gracefully
+					var counter = 40
+					val never = Promise[Boolean].future
+					while((s"jps" !!).split("\n").exists(_ == s"$pid CassandraDaemon") && counter > 0) {
+						try{
+							Await.ready(never, 250 millis)
+						} catch {
+							case _ : Throwable => counter = counter - 1
+						}
+					}
+					if(counter == 0) {
+						//waited to long...
+						s"kill -9 $pid" !
+					}
+					if(clean) {
+						val cassData = (home / "data").getAbsolutePath
+						s"rm -r $cassData" !
+					}
+				}
+			})
 		}
 	)
 	
