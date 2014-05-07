@@ -2,7 +2,7 @@ sbt-cassandra-plugin
 ====================
 
 This is a work in progress project.  The goal is to allow launching [Cassandra](http://cassandra.apache.org) during tests, and test your application against it (much like the [plugin for maven](http://mojo.codehaus.org/cassandra-maven-plugin)).
-at this pre-mature phase, only the very basic functionality works. API is not final, and might (probably will) change down the road.
+at this pre-mature phase, only the very basic functionality works (and only on linux/unix). API is not final, and might (probably will) change down the road.
 However, the plugin is already usable as is.
 
 ## Installation ##
@@ -10,7 +10,7 @@ Add the following to your `project/plugins.sbt` file:
 ```scala
 addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.1-SNAPSHOT")
 ```
-Until i'll get this plugin hosted, you can build it yourself, and use `sbt publish-local` to have it available in your local `~/.ivy`.
+Until i'll get this plugin hosted, you can build it yourself, and use `sbt publish-local` to have it available in your local `~/.ivy2`.
 
 ## Usage ##
 ### Basic: ###
@@ -52,17 +52,10 @@ to intialize cassandra with your custom cassandra-cli commands, use:
 ```scala
 cassandraCliInit := "/path/to/cassandra-cli/commands/file"
 ```
-~~to intialize cassandra with your custom cql commands, use:~~(not implemented yet)
+to intialize cassandra with your custom cql commands, use:
 ```scala
 cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 ```
 
 ##### IMPORTANT NOTES #####
-Regarding the CQL commands, the file must contain `exit;` as the last line.
-your file might look something like:
-```
-create keyspace Data with ... ;
-use Data;
-create column family MoreData with ... ;
-exit;
-```
+don't use both CQL & CLI. shoose only one...
