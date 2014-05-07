@@ -34,15 +34,13 @@ libraryDependencies += "org.apache.cassandra" % "apache-cassandra" % "2.0.6"
 ```scala
 cassandraVersion <<= (libraryDependencies) (_.collect{case ModuleID("org.apache.cassandra","apache-cassandra",version,_,_,_,_,_,_,_,_) => version}.head)
 ```
-to stop cassandra after the tests finished and clean the data directory, you could use:
+cassandra now shuts down & cleans the data by default when tests are done. to disable this behavior, set:
 ```scala
-testOptions in Test <+= (cassandraPid, cassandraHome) map {
-  case (pid, cassHome) => Tests.Cleanup(() => {
-    s"kill $pid" !
-    val data = (cassHome / "data").getAbsolutePath
-    s"rm -r $data" !
-  })
-}
+cleanCassandraAfterTests := false
+```
+and if you want cassandra to stay up:
+```scala
+stopCassandraAfterTests := false
 ```
 to use special configuration files suited for your use case, use:
 ```scala
@@ -58,4 +56,5 @@ cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 ```
 
 ##### IMPORTANT NOTES #####
-don't use both CQL & CLI. shoose only one...
+* don't use both CQL & CLI. shoose only one...
+* when overriding stop / clean, note that `cleanCassandraAfterTests` set to `false` while `stopCassandraAfterTests` set to `true` will be ignored.
