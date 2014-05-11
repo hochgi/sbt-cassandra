@@ -26,10 +26,6 @@ To choose a specific version of cassandra (default is 2.0.6), you can use:
 ```scala
 cassandraVersion := "2.0.6"
 ```
-Now, assuming your project depends on cassandra (well duh...), you probably have your dependencies declared like:
-```scala
-libraryDependencies += "org.apache.cassandra" % "apache-cassandra" % "2.0.6"
-```
 cassandra now shuts down & cleans the data by default when tests are done. to disable this behavior, set:
 ```scala
 cleanCassandraAfterTests := false
