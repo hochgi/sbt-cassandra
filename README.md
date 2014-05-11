@@ -30,10 +30,6 @@ Now, assuming your project depends on cassandra (well duh...), you probably have
 ```scala
 libraryDependencies += "org.apache.cassandra" % "apache-cassandra" % "2.0.6"
 ```
-~~a nifty tweak to set the correct version automatically, could look something like:~~(currently not working, due to a cyclic reference)
-```scala
-cassandraVersion <<= (libraryDependencies) (_.collect{case ModuleID("org.apache.cassandra","apache-cassandra",version,_,_,_,_,_,_,_,_) => version}.head)
-```
 cassandra now shuts down & cleans the data by default when tests are done. to disable this behavior, set:
 ```scala
 cleanCassandraAfterTests := false
