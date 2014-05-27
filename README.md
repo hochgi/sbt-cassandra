@@ -48,5 +48,5 @@ cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 ```
 
 ##### IMPORTANT NOTES #####
-* don't use both CQL & CLI. shoose only one...
+* don't use both CQL & CLI. choose only one...
 * when overriding stop / clean, note that `cleanCassandraAfterTests` set to `true` while `stopCassandraAfterTests` set to `false` will be ignored.
