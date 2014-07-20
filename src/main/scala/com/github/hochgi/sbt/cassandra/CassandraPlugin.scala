@@ -41,7 +41,7 @@ object CassandraPlugin extends Plugin {
 		},
 		deployCassandra <<= (cassandraVersion, target, dependencyClasspath in Runtime) map {
 			case (ver, targetDir, classpath) => {
-				val cassandraTarGz = Build.data(classpath).find(_.getName == s"apache-cassandra-$ver-bin.tar.gz").get
+				val cassandraTarGz = Attributed.data(classpath).find(_.getName == s"apache-cassandra-$ver-bin.tar.gz").get
 				if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
 				println(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
 				Process(Seq("tar","-xzf",cassandraTarGz.getAbsolutePath),targetDir).!
