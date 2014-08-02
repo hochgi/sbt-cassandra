@@ -6,10 +6,8 @@ import scala.concurrent._ ,duration._
 import ExecutionContext.Implicits.global
 import scala.io.Source
 import scala.reflect.io.{File => RFile}
-
-
-//import scala.reflect.io.File
-//import sbt.File
+import org.yaml.snakeyaml.Yaml
+import java.io.FileInputStream
 
 object CassandraPlugin extends Plugin {
 	
@@ -30,7 +28,7 @@ object CassandraPlugin extends Plugin {
 	val stopCassandraAfterTests = SettingKey[Boolean]("stop-cassandra-after-tests")
 	val cleanCassandraAfterTests = SettingKey[Boolean]("clean-cassandra-after-tests")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
-  val stopCassandra = TaskKey[Int]("stop-cassandra")
+        val stopCassandra = TaskKey[Int]("stop-cassandra")
 	
 	val cassandraSettings = Seq(
         cassandraHost := "localhost",
@@ -144,7 +142,7 @@ object CassandraPlugin extends Plugin {
 				tr.open;
 			} catch {
 				case e: TTransportException => {
-					println("[INFO] waiting for cassandra to boot")
+					println(s"[INFO] waiting for cassandra to boot on port $rpcPort")
 					Thread.sleep(500)
 					continue = false
 				}
@@ -169,12 +167,11 @@ object CassandraPlugin extends Plugin {
   def setCassandraRpcPort(conf: Types.Id[String], port:  String): Unit = {
     println(s"[INFO] setting new rpc port for cassandra: port $port")
     val cassandraYamlPath = s"$conf/cassandra.yaml"
-     val cassandraYamlContent = Source.fromFile(cassandraYamlPath)
-      .getLines()
-      .mkString("\n")
-
-    val regex = "rpc_port: \\d+".r
-    val newCassandraYamlFileContent = regex.replaceAllIn(cassandraYamlContent, s"rpc_port: $port")
+    val yaml = new Yaml
+    var cassandraYamlMap = yaml.load(new FileInputStream(new File(cassandraYamlPath)))
+                           .asInstanceOf[java.util.LinkedHashMap[String, String]]
+    cassandraYamlMap.put("rpc_port", port)
+    val newCassandraYamlFileContent = yaml.dump(cassandraYamlMap)
     RFile(cassandraYamlPath).writeAll(newCassandraYamlFileContent)
   }
 }
