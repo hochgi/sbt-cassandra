@@ -46,11 +46,11 @@ to intialize cassandra with your custom cql commands, use:
 ```scala
 cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 ```
-to change cassandra rpc port, use:
+
+to change cassandra rpc port (note: even if you change the port on the configuration, this is the port number that will be used), use:
 ```scala
 cassandraPort := "PORT_NUMBER"
 ```
-
 
 ##### IMPORTANT NOTES #####
 * don't use both CQL & CLI. choose only one...
