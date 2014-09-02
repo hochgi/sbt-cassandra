@@ -4,6 +4,12 @@ import sbt._
 import Keys._
 import scala.concurrent._ ,duration._
 import ExecutionContext.Implicits.global
+import scala.io.Source
+import scala.reflect.io.{File => RFile}
+import org.yaml.snakeyaml.Yaml
+import java.io.FileInputStream
+
+import scala.util.Try
 
 object CassandraPlugin extends Plugin {
 	
@@ -24,6 +30,7 @@ object CassandraPlugin extends Plugin {
 	val stopCassandraAfterTests = SettingKey[Boolean]("stop-cassandra-after-tests")
 	val cleanCassandraAfterTests = SettingKey[Boolean]("clean-cassandra-after-tests")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
+        val stopCassandra = TaskKey[Int]("stop-cassandra")
 	
 	val cassandraSettings = Seq(
         cassandraHost := "localhost",
@@ -41,7 +48,7 @@ object CassandraPlugin extends Plugin {
 		},
 		deployCassandra <<= (cassandraVersion, target, dependencyClasspath in Runtime) map {
 			case (ver, targetDir, classpath) => {
-				val cassandraTarGz = Build.data(classpath).find(_.getName == s"apache-cassandra-$ver-bin.tar.gz").get
+				val cassandraTarGz = Attributed.data(classpath).find(_.getName == s"apache-cassandra-$ver-bin.tar.gz").get
 				if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
 				println(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
 				Process(Seq("tar","-xzf",cassandraTarGz.getAbsolutePath),targetDir).!
@@ -53,7 +60,7 @@ object CassandraPlugin extends Plugin {
 				val pidFile = targetDir / "cass.pid"
 				val jarClasspath = sbt.IO.listFiles(cassHome / "lib").collect{case f: File if f.getName.endsWith(".jar") => f.getAbsolutePath}.mkString(":")
 				
-				val conf = {
+				val conf: Types.Id[String] = {
 					if(confDirAsString == defaultConfigDir) {
 						val configDir = targetDir / "cass.conf"
 						if(!(configDir.exists && configDir.isDirectory)) makeConfigDirectory(configDir)
@@ -64,12 +71,19 @@ object CassandraPlugin extends Plugin {
 				val classpath = conf + ":" + jarClasspath
 				val bin = cassHome / "bin" / "cassandra"
 				val args = Seq(bin.getAbsolutePath, "-p", pidFile.getAbsolutePath)
-				Process(args,cassHome, "CASSANDRA_CONF" -> conf).run
-				println("[INFO] going to wait for cassandra:")
-				waitForCassandra
-				println("[INFO] going to initialize cassandra:")
-				initCassandra(cli,cql,classpath,cassHome,host,port)
-				cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
+        setCassandraRpcPort(conf, port)
+        if (!isCassandraRunning(port)) {
+          Process(args, cassHome, "CASSANDRA_CONF" -> conf).run
+          println("[INFO] going to wait for cassandra:")
+          waitForCassandra(port)
+          println("[INFO] going to initialize cassandra:")
+          initCassandra(cli, cql, classpath, cassHome, host, port)
+          cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
+        } else {
+          println("[INFO] cassandra already running")
+          cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
+        }
+
 			}
 		},
 		//if compilation of test classes fails, cassandra should not be invoked. (moreover, Test.Cleanup won't execute to stop it...)
@@ -80,10 +94,14 @@ object CassandraPlugin extends Plugin {
 				if(cassPid.exists) sbt.IO.read(cassPid).filterNot(_.isWhitespace)
 				else "NO PID" // did you run start-cassandra task?
 			}
-		},//make sure to Stop cassandra when tests are done.
+		},
+		stopCassandra <<= (cassandraPid, cassandraHome) map {
+      case (pid, home) => s"kill $pid" !
+    },
+		//make sure to Stop cassandra when tests are done.
 		testOptions in Test <+= (cassandraPid, cassandraHome, stopCassandraAfterTests, cleanCassandraAfterTests) map {
 			case (pid, home, stop, clean) => Tests.Cleanup(() => {
-				if(stop && pid != "NO PID") {
+			  if(stop && pid != "NO PID") {
 					s"kill $pid" !
 					//give cassandra a chance to exit gracefully
 					var counter = 40
@@ -107,7 +125,29 @@ object CassandraPlugin extends Plugin {
 			})
 		}
 	)
-	
+
+
+
+  def waitCassandraShutdown(pid: String) = {
+    var counter = 40
+    val never = Promise[Boolean].future
+    while((s"jps" !!).split("\n").exists(_ == s"$pid CassandraDaemon") && counter > 0) {
+      try{
+        Await.ready(never, 250 millis)
+      } catch {
+        case _ : Throwable => counter = counter - 1
+      }
+    }
+  }
+
+  def isCassandraRunning(port: String): Boolean = {
+    import org.apache.thrift.transport.{TTransport, TFramedTransport, TSocket, TTransportException}
+    val rpcAddress = "localhost"
+    val rpcPort = port.toInt
+    val tr = new TFramedTransport(new TSocket(rpcAddress, rpcPort))
+    Try { tr.open }.isSuccess
+  }
+
 	def makeConfigDirectory(configDir: File) = {
 		if(configDir.exists) {
 			if(!configDir.isDirectory) {sys.error("could not create conf dir (file in that name exists. use clean to start from scratch).")}
@@ -118,11 +158,11 @@ object CassandraPlugin extends Plugin {
 			sbt.IO.unzipStream(ccz, configDir)
 		}
 	}
-	def waitForCassandra: Unit = {
+	def waitForCassandra(port: String): Unit = {
 		import org.apache.thrift.transport.{TTransport, TFramedTransport, TSocket, TTransportException}
 
 		val rpcAddress = "localhost"
-		val rpcPort = 9160
+		val rpcPort = port.toInt
 		var continue = false
 		while (!continue) {
 			continue = true
@@ -131,7 +171,7 @@ object CassandraPlugin extends Plugin {
 				tr.open;
 			} catch {
 				case e: TTransportException => {
-					println("[INFO] waiting for cassandra to boot")
+					println(s"[INFO] waiting for cassandra to boot on port $rpcPort")
 					Thread.sleep(500)
 					continue = false
 				}
@@ -152,4 +192,15 @@ object CassandraPlugin extends Plugin {
 			Process(args,cassHome).!
 		}
 	}
+
+  def setCassandraRpcPort(conf: Types.Id[String], port:  String): Unit = {
+    println(s"[INFO] setting new rpc port for cassandra: port $port")
+    val cassandraYamlPath = s"$conf/cassandra.yaml"
+    val yaml = new Yaml
+    var cassandraYamlMap = yaml.load(new FileInputStream(new File(cassandraYamlPath)))
+                           .asInstanceOf[java.util.LinkedHashMap[String, String]]
+    cassandraYamlMap.put("rpc_port", port)
+    val newCassandraYamlFileContent = yaml.dump(cassandraYamlMap)
+    RFile(cassandraYamlPath).writeAll(newCassandraYamlFileContent)
+  }
 }
