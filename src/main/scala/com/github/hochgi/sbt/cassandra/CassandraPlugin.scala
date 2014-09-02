@@ -33,30 +33,30 @@ object CassandraPlugin extends Plugin {
         val stopCassandra = TaskKey[Int]("stop-cassandra")
 	
 	val cassandraSettings = Seq(
-        cassandraHost := "localhost",
-        cassandraPort := "9160",
+    cassandraHost := "localhost",
+    cassandraPort := "9160",
 		cassandraConfigDir := defaultConfigDir,
 		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
 		stopCassandraAfterTests := true,
 		cleanCassandraAfterTests := true,
 		cassandraHome <<= (cassandraVersion, target) map {case (ver,targetDir) => targetDir / s"apache-cassandra-${ver}"},
-		cassandraVersion := "2.0.6",
+		cassandraVersion := "2.0.9",
 		classpathTypes ~=  (_ + "tar.gz"),
 		libraryDependencies += {
 			"org.apache.cassandra" % "apache-cassandra" % cassandraVersion.value artifacts(Artifact("apache-cassandra", "tar.gz", "tar.gz","bin")) intransitive()
 		},
-		deployCassandra <<= (cassandraVersion, target, dependencyClasspath in Runtime) map {
-			case (ver, targetDir, classpath) => {
+		deployCassandra <<= (cassandraVersion, target, dependencyClasspath in Runtime, streams) map {
+			case (ver, targetDir, classpath, streams) => {
 				val cassandraTarGz = Attributed.data(classpath).find(_.getName == s"apache-cassandra-$ver-bin.tar.gz").get
 				if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
-				println(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
+				streams.log.info(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
 				Process(Seq("tar","-xzf",cassandraTarGz.getAbsolutePath),targetDir).!
 				targetDir / s"apache-cassandra-${ver}"
 			}
 		},
-		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit,cassandraHost,cassandraPort) map {
-			case (targetDir, cassHome, confDirAsString, cli, cql, host, port) => {
+		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit,cassandraHost,cassandraPort, streams) map {
+			case (targetDir, cassHome, confDirAsString, cli, cql, host, port, streams) => {
 				val pidFile = targetDir / "cass.pid"
 				val jarClasspath = sbt.IO.listFiles(cassHome / "lib").collect{case f: File if f.getName.endsWith(".jar") => f.getAbsolutePath}.mkString(":")
 				
@@ -64,26 +64,25 @@ object CassandraPlugin extends Plugin {
 					if(confDirAsString == defaultConfigDir) {
 						val configDir = targetDir / "cass.conf"
 						if(!(configDir.exists && configDir.isDirectory)) makeConfigDirectory(configDir)
-						println("configDir:" + configDir.getAbsolutePath)
+						streams.log.info("configDir:" + configDir.getAbsolutePath)
 						configDir.getAbsolutePath
 					} else confDirAsString
 				}
 				val classpath = conf + ":" + jarClasspath
 				val bin = cassHome / "bin" / "cassandra"
 				val args = Seq(bin.getAbsolutePath, "-p", pidFile.getAbsolutePath)
-        setCassandraRpcPort(conf, port)
+        setCassandraRpcPort(conf, port, (s: String) => streams.log.info(s))
         if (!isCassandraRunning(port)) {
           Process(args, cassHome, "CASSANDRA_CONF" -> conf).run
-          println("[INFO] going to wait for cassandra:")
-          waitForCassandra(port)
-          println("[INFO] going to initialize cassandra:")
+          streams.log.info("going to wait for cassandra:")
+          waitForCassandra(port, (s: String) => streams.log.info(s))
+          streams.log.info("going to initialize cassandra:")
           initCassandra(cli, cql, classpath, cassHome, host, port)
           cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
         } else {
-          println("[INFO] cassandra already running")
+          streams.log.info("cassandra already running")
           cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
         }
-
 			}
 		},
 		//if compilation of test classes fails, cassandra should not be invoked. (moreover, Test.Cleanup won't execute to stop it...)
@@ -158,7 +157,7 @@ object CassandraPlugin extends Plugin {
 			sbt.IO.unzipStream(ccz, configDir)
 		}
 	}
-	def waitForCassandra(port: String): Unit = {
+	def waitForCassandra(port: String, infoPrintFunc: String => Unit): Unit = {
 		import org.apache.thrift.transport.{TTransport, TFramedTransport, TSocket, TTransportException}
 
 		val rpcAddress = "localhost"
@@ -171,7 +170,7 @@ object CassandraPlugin extends Plugin {
 				tr.open;
 			} catch {
 				case e: TTransportException => {
-					println(s"[INFO] waiting for cassandra to boot on port $rpcPort")
+					infoPrintFunc(s"waiting for cassandra to boot on port $rpcPort")
 					Thread.sleep(500)
 					continue = false
 				}
@@ -193,8 +192,8 @@ object CassandraPlugin extends Plugin {
 		}
 	}
 
-  def setCassandraRpcPort(conf: Types.Id[String], port:  String): Unit = {
-    println(s"[INFO] setting new rpc port for cassandra: port $port")
+  def setCassandraRpcPort(conf: Types.Id[String], port:  String, infoPrintFunc: String => Unit): Unit = {
+    infoPrintFunc(s"setting new rpc port for cassandra: port $port")
     val cassandraYamlPath = s"$conf/cassandra.yaml"
     val yaml = new Yaml
     var cassandraYamlMap = yaml.load(new FileInputStream(new File(cassandraYamlPath)))
