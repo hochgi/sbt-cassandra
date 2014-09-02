@@ -8,7 +8,7 @@ However, the plugin is already usable as is.
 ## Installation ##
 Add the following to your `project/plugins.sbt` file:
 ```scala
-addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.1-SNAPSHOT")
+addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.3-SNAPSHOT")
 ```
 Until i'll get this plugin hosted, you can build it yourself, and use `sbt publish-local` to have it available in your local `~/.ivy2`.
 
@@ -24,7 +24,7 @@ test in Test <<= (test in Test).dependsOn(startCassandra)
 ### Advanced: ##
 To choose a specific version of cassandra (default is 2.0.6), you can use:
 ```scala
-cassandraVersion := "2.0.6"
+cassandraVersion := "2.0.9"
 ```
 cassandra now shuts down & cleans the data by default when tests are done. to disable this behavior, set:
 ```scala
