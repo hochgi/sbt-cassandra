@@ -8,7 +8,7 @@ However, the plugin is already usable as is.
 ## Installation ##
 Add the following to your `project/plugins.sbt` file:
 ```scala
-addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.3-SNAPSHOT")
+addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.4-SNAPSHOT")
 ```
 Until i'll get this plugin hosted, you can build it yourself, and use `sbt publish-local` to have it available in your local `~/.ivy2`.
 
@@ -22,15 +22,11 @@ seq(CassandraPlugin.cassandraSettings:_ *)
 test in Test <<= (test in Test).dependsOn(startCassandra)
 ``` 
 ### Advanced: ##
-To choose a specific version of cassandra (default is 2.0.6), you can use:
+To choose a specific version of cassandra (default is 2.0.9), you can use:
 ```scala
-cassandraVersion := "2.0.9"
+cassandraVersion := "2.1.2"
 ```
-cassandra now shuts down & cleans the data by default when tests are done. to disable this behavior, set:
-```scala
-cleanCassandraAfterTests := false
-```
-and if you want cassandra to stay up:
+cassandra now shuts down by default when tests are done. to disable this behavior, set:
 ```scala
 stopCassandraAfterTests := false
 ```
@@ -46,12 +42,24 @@ to intialize cassandra with your custom cql commands, use:
 ```scala
 cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 ```
-
 to change cassandra rpc port (note: even if you change the port on the configuration, this is the port number that will be used), use:
 ```scala
 cassandraPort := "PORT_NUMBER"
 ```
-
+also, you may override any other configuration, e.g:
+```scala
+configMappings +=  "auto_snapshot" -> true
+configMappings ++= Seq(
+  "rpc_server_type" -> "sync", 
+  "data_file_directories" -> {
+    val list = new java.util.LinkedList[String]()
+    list.add("/path/to/directory/on/disk1")
+    list.add("/path/to/directory/on/disk2")
+    list.add("/path/to/directory/on/disk3")
+    list
+  }
+)
+```
 ##### IMPORTANT NOTES #####
 * don't use both CQL & CLI. choose only one...
-* when overriding stop / clean, note that `cleanCassandraAfterTests` set to `true` while `stopCassandraAfterTests` set to `false` will be ignored.
+* the `configMappings` key takes a sequence of `(String,java.lang.Object)`, and should be compatible with actual value represented by the key in the yaml file.
