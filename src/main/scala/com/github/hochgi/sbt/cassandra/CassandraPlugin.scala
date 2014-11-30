@@ -43,7 +43,7 @@ object CassandraPlugin extends Plugin {
 				Seq(
 					"rpc_port" -> port,
 					"data_file_directories" -> {
-						val l = new util.LinkedList[String]()
+						val l = new java.util.LinkedList[String]()
 						l.add(d("data"))
 						l
 					},
