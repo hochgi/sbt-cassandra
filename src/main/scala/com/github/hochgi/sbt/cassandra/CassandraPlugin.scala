@@ -1,14 +1,13 @@
 package com.github.hochgi.sbt.cassandra
 
+import java.util.Properties
+import semverfi._
 import sbt._
 import Keys._
 import scala.concurrent._ ,duration._
 import ExecutionContext.Implicits.global
-import scala.io.Source
-import scala.reflect.io.{File => RFile}
 import org.yaml.snakeyaml.Yaml
-import java.io.FileInputStream
-
+import java.io._
 import scala.util.Try
 
 object CassandraPlugin extends Plugin {
@@ -24,24 +23,47 @@ object CassandraPlugin extends Plugin {
 	val cassandraCqlInit = SettingKey[String]("cassandra-cql-init")
 	val cassandraHost = SettingKey[String]("cassandra-host")
 	val cassandraPort = SettingKey[String]("cassandra-port")
+	val cassandraCqlPort = SettingKey[String]("cassandra-cql-port")
 	val cassandraHome = TaskKey[File]("cassandra-home")
+	val configMappings = SettingKey[Seq[(String,java.lang.Object)]]("cassandra-conf", "used to override values in conf/cassandra.yaml. values are appropriate java objects")
 	val deployCassandra = TaskKey[File]("deploy-cassandra")
-	val startCassandra = TaskKey[sbt.Def.Setting[sbt.Task[String]]]("start-cassandra")
+	val startCassandra = TaskKey[String]("start-cassandra")
 	val stopCassandraAfterTests = SettingKey[Boolean]("stop-cassandra-after-tests")
-	val cleanCassandraAfterTests = SettingKey[Boolean]("clean-cassandra-after-tests")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
-        val stopCassandra = TaskKey[Int]("stop-cassandra")
+	val stopCassandra = TaskKey[Int]("stop-cassandra")
 	
 	val cassandraSettings = Seq(
     cassandraHost := "localhost",
     cassandraPort := "9160",
+		configMappings := Seq(),
+		configMappings <++= (cassandraPort,target){
+			case (port, targetDir) => {
+				val data = targetDir / "data"
+				def d(s: String): String = (data / s).getAbsolutePath
+				Seq(
+					"rpc_port" -> port,
+					"data_file_directories" -> {
+						val l = new util.LinkedList[String]()
+						l.add(d("data"))
+						l
+					},
+					"commitlog_directory" -> d("commitlog"),
+					"saved_caches_directory" -> d("saved_caches")
+				)
+			}
+		},
 		cassandraConfigDir := defaultConfigDir,
 		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
 		stopCassandraAfterTests := true,
-		cleanCassandraAfterTests := true,
 		cassandraHome <<= (cassandraVersion, target) map {case (ver,targetDir) => targetDir / s"apache-cassandra-${ver}"},
-		cassandraVersion := "2.0.9",
+		cassandraVersion := "2.1.2",
+		cassandraCqlPort <<= (cassandraPort, cassandraVersion){
+			case (oldPort, ver) => {
+				if(Version(ver) > Version("2.1.0")) "9042"
+				else oldPort
+			}
+		},
 		classpathTypes ~=  (_ + "tar.gz"),
 		libraryDependencies += {
 			"org.apache.cassandra" % "apache-cassandra" % cassandraVersion.value artifacts(Artifact("apache-cassandra", "tar.gz", "tar.gz","bin")) intransitive()
@@ -52,37 +74,48 @@ object CassandraPlugin extends Plugin {
 				if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
 				streams.log.info(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
 				Process(Seq("tar","-xzf",cassandraTarGz.getAbsolutePath),targetDir).!
-				targetDir / s"apache-cassandra-${ver}"
+				val cassHome = targetDir / s"apache-cassandra-${ver}"
+				//old cassandra versions used log4j, newer versions use logback and are configurable through env vars
+				val oldLogging = cassHome / "conf" / "log4j-server.properties"
+				if(oldLogging.exists) {
+					val in: FileInputStream = new FileInputStream(oldLogging)
+					val props: Properties = new Properties
+					props.load(in)
+					in.close
+					val out: FileOutputStream = new FileOutputStream(oldLogging)
+					props.setProperty("log4j.appender.R.File", (targetDir / "data" / "logs").getAbsolutePath)
+					props.store(out, null)
+					out.close
+				}
+				cassHome
 			}
 		},
-		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit,cassandraHost,cassandraPort, streams) map {
-			case (targetDir, cassHome, confDirAsString, cli, cql, host, port, streams) => {
+		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit,cassandraHost,cassandraPort,cassandraCqlPort,configMappings,streams) map {
+			case (targetDir, cassHome, confDirAsString, cli, cql, host, port,cqlPort, confMappings, streams) => {
 				val pidFile = targetDir / "cass.pid"
 				val jarClasspath = sbt.IO.listFiles(cassHome / "lib").collect{case f: File if f.getName.endsWith(".jar") => f.getAbsolutePath}.mkString(":")
-				
-				val conf: Types.Id[String] = {
+				val conf: String = {
 					if(confDirAsString == defaultConfigDir) {
-						val configDir = targetDir / "cass.conf"
-						if(!(configDir.exists && configDir.isDirectory)) makeConfigDirectory(configDir)
-						streams.log.info("configDir:" + configDir.getAbsolutePath)
+						val configDir = cassHome / "conf"
 						configDir.getAbsolutePath
 					} else confDirAsString
 				}
 				val classpath = conf + ":" + jarClasspath
 				val bin = cassHome / "bin" / "cassandra"
 				val args = Seq(bin.getAbsolutePath, "-p", pidFile.getAbsolutePath)
-        setCassandraRpcPort(conf, port, (s: String) => streams.log.info(s))
+				overrideConfigs(conf, confMappings, streams.log)
         if (!isCassandraRunning(port)) {
-          Process(args, cassHome, "CASSANDRA_CONF" -> conf).run
+          Process(args, cassHome, "CASSANDRA_CONF" -> conf, "CASSANDRA_HOME" -> cassHome.getAbsolutePath).run
           streams.log.info("going to wait for cassandra:")
           waitForCassandra(port, (s: String) => streams.log.info(s))
           streams.log.info("going to initialize cassandra:")
-          initCassandra(cli, cql, classpath, cassHome, host, port)
-          cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
+          initCassandra(cli, cql, classpath, cassHome, host, port, cqlPort)
         } else {
-          streams.log.info("cassandra already running")
-          cassandraPid := sbt.IO.read(pidFile).filterNot(_.isWhitespace)
+          streams.log.warn("cassandra already running")
         }
+				val pid = Try(sbt.IO.read(pidFile).filterNot(_.isWhitespace)).getOrElse("NO PID")
+				cassandraPid := pid
+				pid
 			}
 		},
 		//if compilation of test classes fails, cassandra should not be invoked. (moreover, Test.Cleanup won't execute to stop it...)
@@ -94,12 +127,12 @@ object CassandraPlugin extends Plugin {
 				else "NO PID" // did you run start-cassandra task?
 			}
 		},
-		stopCassandra <<= (cassandraPid, cassandraHome) map {
-      case (pid, home) => s"kill $pid" !
+		stopCassandra <<= (cassandraPid) map {
+      case pid => s"kill $pid" !
     },
 		//make sure to Stop cassandra when tests are done.
-		testOptions in Test <+= (cassandraPid, cassandraHome, stopCassandraAfterTests, cleanCassandraAfterTests) map {
-			case (pid, home, stop, clean) => Tests.Cleanup(() => {
+		testOptions in Test <+= (cassandraPid, cassandraHome, stopCassandraAfterTests) map {
+			case (pid, home, stop) => Tests.Cleanup(() => {
 			  if(stop && pid != "NO PID") {
 					s"kill $pid" !
 					//give cassandra a chance to exit gracefully
@@ -116,16 +149,10 @@ object CassandraPlugin extends Plugin {
 						//waited to long...
 						s"kill -9 $pid" !
 					}
-					if(clean) {
-						val cassData = (home / "data").getAbsolutePath
-						s"rm -r $cassData" !
-					}
 				}
 			})
 		}
 	)
-
-
 
   def waitCassandraShutdown(pid: String) = {
     var counter = 40
@@ -147,16 +174,6 @@ object CassandraPlugin extends Plugin {
     Try { tr.open }.isSuccess
   }
 
-	def makeConfigDirectory(configDir: File) = {
-		if(configDir.exists) {
-			if(!configDir.isDirectory) {sys.error("could not create conf dir (file in that name exists. use clean to start from scratch).")}
-		} else {
-			configDir.mkdirs		
-			val ccz = getClass.getClassLoader.getResourceAsStream("cass.conf.zip")
-			if (ccz == null) sys.error("could not load: cass.conf.zip")
-			sbt.IO.unzipStream(ccz, configDir)
-		}
-	}
 	def waitForCassandra(port: String, infoPrintFunc: String => Unit): Unit = {
 		import org.apache.thrift.transport.{TTransport, TFramedTransport, TSocket, TTransportException}
 
@@ -178,7 +195,7 @@ object CassandraPlugin extends Plugin {
 			if (tr.isOpen) tr.close
 		}
 	}
-	def initCassandra(cli: String, cql: String, classpath: String, cassHome: File, host: String, port: String): Unit = {
+	def initCassandra(cli: String, cql: String, classpath: String, cassHome: File, host: String, port: String, cqlPort: String): Unit = {
 		if(cli != defaultCliInit && cql != defaultCqlInit) sys.error("use cli initiation commands, or cql initiation commands, but not both!")
 		else if(cli != defaultCliInit) {
 			val bin = cassHome / "bin" / "cassandra-cli"
@@ -187,19 +204,33 @@ object CassandraPlugin extends Plugin {
 		}
 		else if(cql != defaultCqlInit) {
 			val bin = cassHome / "bin" / "cqlsh"
-			val args = Seq(bin.getAbsolutePath, "-f", cql,host,port)
+			val args = Seq(bin.getAbsolutePath, "-f", cql,host,cqlPort)
 			Process(args,cassHome).!
 		}
 	}
 
-  def setCassandraRpcPort(conf: Types.Id[String], port:  String, infoPrintFunc: String => Unit): Unit = {
-    infoPrintFunc(s"setting new rpc port for cassandra: port $port")
-    val cassandraYamlPath = s"$conf/cassandra.yaml"
+  def overrideConfigs(confDir: String, confMappings:  Seq[(String,java.lang.Object)], logger: Logger): Unit = {
+    val cassandraYamlPath = s"$confDir/cassandra.yaml"
     val yaml = new Yaml
-    var cassandraYamlMap = yaml.load(new FileInputStream(new File(cassandraYamlPath)))
-                           .asInstanceOf[java.util.LinkedHashMap[String, String]]
-    cassandraYamlMap.put("rpc_port", port)
-    val newCassandraYamlFileContent = yaml.dump(cassandraYamlMap)
-    RFile(cassandraYamlPath).writeAll(newCassandraYamlFileContent)
+    val cassandraYamlMap = yaml.load(new FileInputStream(new File(cassandraYamlPath)))
+                           .asInstanceOf[java.util.LinkedHashMap[String, java.lang.Object]]
+		confMappings.foreach{
+			case (prop,value) => {
+				logger.info(s"setting configuration [$prop] with [$value]")
+				cassandraYamlMap.put(prop, value)
+			}
+		}
+
+		val it = cassandraYamlMap.entrySet().iterator()
+		val m = new java.util.LinkedHashMap[String, java.lang.Object]()
+		while(it.hasNext) {
+			val cur = it.next()
+			if(cur.getValue != null) {
+				m.put(cur.getKey, cur.getValue)
+			}
+		}
+		val ymlContent = yaml.dump(m)
+		logger.debug(ymlContent)
+		sbt.IO.write(file(cassandraYamlPath), ymlContent, java.nio.charset.StandardCharsets.UTF_8, false)
   }
 }
