@@ -4,7 +4,7 @@ organization := "com.github.hochgi"
 
 name := "sbt-cassandra-plugin"
 
-version := "0.4-SNAPSHOT"
+version := "0.5"
 
 scalaVersion := "2.10.4"
 
