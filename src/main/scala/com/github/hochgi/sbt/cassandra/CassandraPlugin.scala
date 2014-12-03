@@ -29,8 +29,9 @@ object CassandraPlugin extends Plugin {
 	val deployCassandra = TaskKey[File]("deploy-cassandra")
 	val startCassandra = TaskKey[String]("start-cassandra")
 	val stopCassandraAfterTests = SettingKey[Boolean]("stop-cassandra-after-tests")
+	val cleanCassandraAfterStop = SettingKey[Boolean]("stop-cassandra-after-tests")
 	val cassandraPid = TaskKey[String]("cassandra-pid")
-	val stopCassandra = TaskKey[Int]("stop-cassandra")
+	val stopCassandra = TaskKey[Unit]("stop-cassandra")
 	
 	val cassandraSettings = Seq(
     cassandraHost := "localhost",
@@ -56,6 +57,7 @@ object CassandraPlugin extends Plugin {
 		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
 		stopCassandraAfterTests := true,
+		cleanCassandraAfterStop := true,
 		cassandraHome <<= (cassandraVersion, target) map {case (ver,targetDir) => targetDir / s"apache-cassandra-${ver}"},
 		cassandraVersion := "2.1.2",
 		cassandraCqlPort <<= (cassandraPort, cassandraVersion){
@@ -127,32 +129,35 @@ object CassandraPlugin extends Plugin {
 				else "NO PID" // did you run start-cassandra task?
 			}
 		},
-		stopCassandra <<= (cassandraPid) map {
-      case pid => s"kill $pid" !
+		stopCassandra <<= (cassandraPid, cleanCassandraAfterStop, target) map {
+      case (pid,clean,targetDir) => stopCassandraMethod(clean, targetDir/ "data", pid)
     },
 		//make sure to Stop cassandra when tests are done.
-		testOptions in Test <+= (cassandraPid, cassandraHome, stopCassandraAfterTests) map {
-			case (pid, home, stop) => Tests.Cleanup(() => {
-			  if(stop && pid != "NO PID") {
-					s"kill $pid" !
-					//give cassandra a chance to exit gracefully
-					var counter = 40
-					val never = Promise[Boolean].future
-					while((s"jps" !!).split("\n").exists(_ == s"$pid CassandraDaemon") && counter > 0) {
-						try{
-							Await.ready(never, 250 millis)
-						} catch {
-							case _ : Throwable => counter = counter - 1
-						}
-					}
-					if(counter == 0) {
-						//waited to long...
-						s"kill -9 $pid" !
-					}
-				}
+		testOptions in Test <+= (cassandraPid, stopCassandraAfterTests, cleanCassandraAfterStop, target) map {
+			case (pid, stop, clean, targetDir) => Tests.Cleanup(() => {
+				if(stop) stopCassandraMethod(clean, targetDir / "data", pid)
 			})
 		}
 	)
+
+	def stopCassandraMethod(clean: Boolean, dataDir: File, pid: String) = if(pid != "NO PID") {
+		s"kill $pid" !
+		//give cassandra a chance to exit gracefully
+		var counter = 40
+		val never = Promise().future
+		while((s"jps" !!).split("\n").exists(_ == s"$pid CassandraDaemon") && counter > 0) {
+			try{
+				Await.ready(never, 250 millis)
+			} catch {
+				case _ : Throwable => counter = counter - 1
+			}
+		}
+		if(counter == 0) {
+			//waited to long...
+			s"kill -9 $pid" !
+		}
+		if(clean) sbt.IO.delete(dataDir)
+	}
 
   def waitCassandraShutdown(pid: String) = {
     var counter = 40

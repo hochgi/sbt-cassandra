@@ -30,6 +30,10 @@ cassandra now shuts down by default when tests are done. to disable this behavio
 ```scala
 stopCassandraAfterTests := false
 ```
+cassandra will also clean it's data by default when it stops (after tests or when invoking `stopCassandra` task explicitly). to disable this behavior, set:
+```scala
+cleanCassandraAfterStop := false
+```
 to use special configuration files suited for your use case, use:
 ```scala
 cassandraConfigDir := "/path/to/your/conf/dir"
