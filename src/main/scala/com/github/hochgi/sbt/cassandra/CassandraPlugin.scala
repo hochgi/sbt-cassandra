@@ -208,7 +208,9 @@ object CassandraPlugin extends Plugin {
 			Process(args,cassHome).!
 		}
 		else if(cql != defaultCqlInit) {
-			val bin = cassHome / "bin" / "cqlsh"
+            val bin = cassHome / "bin" / "cqlsh"
+            val cqlPath = new File(cql).getAbsolutePath
+            val args = Seq(bin.getAbsolutePath, "-f", cqlPath,host,cqlPort)
 			val args = Seq(bin.getAbsolutePath, "-f", cql,host,cqlPort)
 			Process(args,cassHome).!
 		}
