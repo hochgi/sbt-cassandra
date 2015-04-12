@@ -211,8 +211,7 @@ object CassandraPlugin extends Plugin {
             val bin = cassHome / "bin" / "cqlsh"
             val cqlPath = new File(cql).getAbsolutePath
             val args = Seq(bin.getAbsolutePath, "-f", cqlPath,host,cqlPort)
-			val args = Seq(bin.getAbsolutePath, "-f", cql,host,cqlPort)
-			Process(args,cassHome).!
+            Process(args,cassHome).!
 		}
 	}
 
