@@ -6,20 +6,19 @@ name := "sbt-cassandra-plugin"
 
 description := "SBT plugin to allow launching Cassandra during tests, and test your application against it"
 
-version := "0.5"
+version := "0.6"
 
 scalaVersion := "2.10.4"
 
-libraryDependencies ++= Seq("org.apache.thrift" % "libthrift" % "0.9.2",
-                            "org.slf4j" % "slf4j-api" % "1.7.7",
-                            "org.slf4j" % "jcl-over-slf4j" % "1.7.7",
-                            "org.yaml" % "snakeyaml" % "1.14",
+libraryDependencies ++= Seq("org.apache.thrift" % "libthrift" % "0.9.2" exclude("commons-logging","commons-logging"),
+                            "org.slf4j" % "slf4j-api" % "1.7.12",
+                            "org.slf4j" % "jcl-over-slf4j" % "1.7.12",
+                            "org.yaml" % "snakeyaml" % "1.15",
                             "me.lessis" %% "semverfi" % "0.1.3")
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:postfixOps")
 
-externalDependencyClasspath in Compile ~= (_.filterNot(_.data.toString.contains("commons-logging")))
-
+net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 publishTo <<= version { v: String =>
   val nexus = "https://oss.sonatype.org/"

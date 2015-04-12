@@ -8,16 +8,16 @@ However, the plugin is already usable as is.
 ## Installation ##
 Add the following to your `project/plugins.sbt` file:
 ```scala
-addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.5")
+resolvers += "Sonatype OSS Releases" at "https://oss.sonatype.org/content/repositories/releases"
+addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.6")
 ```
-Until i'll get this plugin hosted, you can build it yourself, and use `sbt publish-local` to have it available in your local `~/.ivy2`.
 
 ## Usage ##
 ### Basic: ###
 ```scala
 import com.github.hochgi.sbt.cassandra._
     
-seq(CassandraPlugin.cassandraSettings:_ *)
+CassandraPlugin.cassandraSettings
    
 test in Test <<= (test in Test).dependsOn(startCassandra)
 ``` 
@@ -49,6 +49,10 @@ cassandraCqlInit := "/path/to/cassandra-cql/commands/file"
 to change cassandra rpc port (note: even if you change the port on the configuration, this is the port number that will be used), use:
 ```scala
 cassandraPort := "PORT_NUMBER"
+```
+timeout for waiting on cassandra to start can be configured with property:
+```scala
+cassandraStartDeadline := 10
 ```
 also, you may override any other configuration, e.g:
 ```scala

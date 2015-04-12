@@ -25,6 +25,7 @@ object CassandraPlugin extends Plugin {
 	val cassandraPort = SettingKey[String]("cassandra-port")
 	val cassandraCqlPort = SettingKey[String]("cassandra-cql-port")
 	val cassandraHome = TaskKey[File]("cassandra-home")
+	val cassandraStartDeadline = TaskKey[Int]("cassandra-start-deadline")
 	val configMappings = SettingKey[Seq[(String,java.lang.Object)]]("cassandra-conf", "used to override values in conf/cassandra.yaml. values are appropriate java objects")
 	val deployCassandra = TaskKey[File]("deploy-cassandra")
 	val startCassandra = TaskKey[String]("start-cassandra")
@@ -58,6 +59,7 @@ object CassandraPlugin extends Plugin {
 		cassandraCqlInit := defaultCqlInit,
 		stopCassandraAfterTests := true,
 		cleanCassandraAfterStop := true,
+        cassandraStartDeadline := 5,
 		cassandraHome <<= (cassandraVersion, target) map {case (ver,targetDir) => targetDir / s"apache-cassandra-${ver}"},
 		cassandraVersion := "2.1.2",
 		cassandraCqlPort <<= (cassandraPort, cassandraVersion){
@@ -92,8 +94,8 @@ object CassandraPlugin extends Plugin {
 				cassHome
 			}
 		},
-		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit,cassandraHost,cassandraPort,cassandraCqlPort,configMappings,streams) map {
-			case (targetDir, cassHome, confDirAsString, cli, cql, host, port,cqlPort, confMappings, streams) => {
+		startCassandra <<= (target, deployCassandra, cassandraConfigDir,cassandraCliInit,cassandraCqlInit,cassandraHost,cassandraPort,cassandraCqlPort, cassandraStartDeadline, configMappings, streams) map {
+			case (targetDir, cassHome, confDirAsString, cli, cql, host, port, cqlPort, startDeadline, confMappings, streams) => {
 				val pidFile = targetDir / "cass.pid"
 				val jarClasspath = sbt.IO.listFiles(cassHome / "lib").collect{case f: File if f.getName.endsWith(".jar") => f.getAbsolutePath}.mkString(":")
 				val conf: String = {
@@ -109,17 +111,17 @@ object CassandraPlugin extends Plugin {
         if (!isCassandraRunning(port)) {
           Process(args, cassHome, "CASSANDRA_CONF" -> conf, "CASSANDRA_HOME" -> cassHome.getAbsolutePath).run
           streams.log.info("going to wait for cassandra:")
-          waitForCassandra(port, (s: String) => streams.log.info(s))
+          waitForCassandra(port, startDeadline, (s: String) => streams.log.info(s))
           streams.log.info("going to initialize cassandra:")
           initCassandra(cli, cql, classpath, cassHome, host, port, cqlPort)
         } else {
           streams.log.warn("cassandra already running")
         }
-				val pid = Try(sbt.IO.read(pidFile).filterNot(_.isWhitespace)).getOrElse("NO PID")
-				cassandraPid := pid
-				pid
-			}
-		},
+          val pid = Try(sbt.IO.read(pidFile).filterNot(_.isWhitespace)).getOrElse("NO PID")
+          cassandraPid := pid
+          pid
+        }
+      },
 		//if compilation of test classes fails, cassandra should not be invoked. (moreover, Test.Cleanup won't execute to stop it...)
 		startCassandra <<= (startCassandra).dependsOn(compile in Test),
 		cassandraPid <<= (target) map {
@@ -179,27 +181,32 @@ object CassandraPlugin extends Plugin {
     Try { tr.open }.isSuccess
   }
 
-	def waitForCassandra(port: String, infoPrintFunc: String => Unit): Unit = {
-		import org.apache.thrift.transport.{TTransport, TFramedTransport, TSocket, TTransportException}
+  def waitForCassandra(port: String, deadline: Int, infoPrintFunc: String => Unit): Unit = {
+    import org.apache.thrift.transport.{TTransport, TFramedTransport, TSocket, TTransportException}
+    import scala.concurrent.duration._
 
-		val rpcAddress = "localhost"
-		val rpcPort = port.toInt
-		var continue = false
-		while (!continue) {
-			continue = true
-			val tr: TTransport = new TFramedTransport(new TSocket(rpcAddress, rpcPort))
-			try {
-				tr.open;
-			} catch {
-				case e: TTransportException => {
-					infoPrintFunc(s"waiting for cassandra to boot on port $rpcPort")
-					Thread.sleep(500)
-					continue = false
-				}
-			}
-			if (tr.isOpen) tr.close
-		}
-	}
+    val rpcAddress = "localhost"
+    val rpcPort = port.toInt
+    var continue = false
+    val deadlineTime = deadline.seconds.fromNow
+    while (!continue && deadlineTime.hasTimeLeft) {
+      continue = true
+      val tr: TTransport = new TFramedTransport(new TSocket(rpcAddress, rpcPort))
+      try {
+        tr.open
+      } catch {
+        case e: TTransportException => {
+          infoPrintFunc(s"waiting for cassandra to boot on port $rpcPort")
+          Thread.sleep(500)
+          continue = false
+        }
+      }
+      if (tr.isOpen) {
+        tr.close
+      }
+    }
+  }
+
   def initCassandra(cli: String, cql: String, classpath: String, cassHome: File, host: String, port: String, cqlPort: String): Unit = {
     if(cli != defaultCliInit && cql != defaultCqlInit) {
       sys.error("use cli initiation commands, or cql initiation commands, but not both!")
