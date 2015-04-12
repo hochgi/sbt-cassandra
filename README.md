@@ -50,7 +50,7 @@ to change cassandra rpc port (note: even if you change the port on the configura
 ```scala
 cassandraPort := "PORT_NUMBER"
 ```
-timeout for waiting on cassandra to start can be configured with property:
+timeout for waiting on cassandra to start (default is 20 seconds) can be configured with property (in seconds):
 ```scala
 cassandraStartDeadline := 10
 ```

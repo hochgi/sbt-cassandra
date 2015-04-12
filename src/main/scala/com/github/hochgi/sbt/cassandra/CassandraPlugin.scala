@@ -59,7 +59,7 @@ object CassandraPlugin extends Plugin {
 		cassandraCqlInit := defaultCqlInit,
 		stopCassandraAfterTests := true,
 		cleanCassandraAfterStop := true,
-        cassandraStartDeadline := 5,
+        cassandraStartDeadline := 20,
 		cassandraHome <<= (cassandraVersion, target) map {case (ver,targetDir) => targetDir / s"apache-cassandra-${ver}"},
 		cassandraVersion := "2.1.2",
 		cassandraCqlPort <<= (cassandraPort, cassandraVersion){
@@ -187,18 +187,17 @@ object CassandraPlugin extends Plugin {
 
     val rpcAddress = "localhost"
     val rpcPort = port.toInt
-    var continue = false
+    var retry = true
     val deadlineTime = deadline.seconds.fromNow
-    while (!continue && deadlineTime.hasTimeLeft) {
-      continue = true
+    while (retry && deadlineTime.hasTimeLeft) {
       val tr: TTransport = new TFramedTransport(new TSocket(rpcAddress, rpcPort))
       try {
         tr.open
+        retry = false
       } catch {
         case e: TTransportException => {
           infoPrintFunc(s"waiting for cassandra to boot on port $rpcPort")
           Thread.sleep(500)
-          continue = false
         }
       }
       if (tr.isOpen) {
