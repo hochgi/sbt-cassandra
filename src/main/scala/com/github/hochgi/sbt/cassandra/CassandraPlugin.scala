@@ -200,21 +200,20 @@ object CassandraPlugin extends Plugin {
 			if (tr.isOpen) tr.close
 		}
 	}
-	def initCassandra(cli: String, cql: String, classpath: String, cassHome: File, host: String, port: String, cqlPort: String): Unit = {
-		if(cli != defaultCliInit && cql != defaultCqlInit) sys.error("use cli initiation commands, or cql initiation commands, but not both!")
-		else if(cli != defaultCliInit) {
-			val bin = cassHome / "bin" / "cassandra-cli"
-			val args = Seq(bin.getAbsolutePath, "-f", cli,"-h",host,"-p",port)
-			Process(args,cassHome).!
-		}
-		else if(cql != defaultCqlInit) {
-            val bin = cassHome / "bin" / "cqlsh"
-            val cqlPath = new File(cql).getAbsolutePath
-            val args = Seq(bin.getAbsolutePath, "-f", cqlPath,host,cqlPort)
-			val args = Seq(bin.getAbsolutePath, "-f", cql,host,cqlPort)
-			Process(args,cassHome).!
-		}
-	}
+  def initCassandra(cli: String, cql: String, classpath: String, cassHome: File, host: String, port: String, cqlPort: String): Unit = {
+    if(cli != defaultCliInit && cql != defaultCqlInit) {
+      sys.error("use cli initiation commands, or cql initiation commands, but not both!")
+    } else if(cli != defaultCliInit) {
+      val bin = cassHome / "bin" / "cassandra-cli"
+      val args = Seq(bin.getAbsolutePath, "-f", cli,"-h",host,"-p",port)
+      Process(args,cassHome).!
+    } else if(cql != defaultCqlInit) {
+      val bin = cassHome / "bin" / "cqlsh"
+      val cqlPath = new File(cql).getAbsolutePath
+      val args = Seq(bin.getAbsolutePath, "-f", cqlPath,host,cqlPort)
+      Process(args,cassHome).!
+    }
+  }
 
   def overrideConfigs(confDir: String, confMappings:  Seq[(String,java.lang.Object)], logger: Logger): Unit = {
     val cassandraYamlPath = s"$confDir/cassandra.yaml"
