@@ -9,20 +9,21 @@ However, the plugin is already usable as is.
 Add the following to your `project/plugins.sbt` file:
 ```scala
 resolvers += "Sonatype OSS Releases" at "https://oss.sonatype.org/content/repositories/releases"
-addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.6")
+
+addSbtPlugin("com.github.hochgi" % "sbt-cassandra-plugin" % "0.6.1")
 ```
 
 ## Usage ##
 ### Basic: ###
 ```scala
 import com.github.hochgi.sbt.cassandra._
-    
+
 CassandraPlugin.cassandraSettings
-   
+
 test in Test <<= (test in Test).dependsOn(startCassandra)
-``` 
+```
 ### Advanced: ##
-To choose a specific version of cassandra (default is 2.0.9), you can use:
+To choose a specific version of cassandra (default is 2.1.2), you can use:
 ```scala
 cassandraVersion := "2.1.2"
 ```
@@ -58,7 +59,7 @@ also, you may override any other configuration, e.g:
 ```scala
 configMappings +=  "auto_snapshot" -> true
 configMappings ++= Seq(
-  "rpc_server_type" -> "sync", 
+  "rpc_server_type" -> "sync",
   "data_file_directories" -> {
     val list = new java.util.LinkedList[String]()
     list.add("/path/to/directory/on/disk1")

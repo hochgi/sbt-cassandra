@@ -6,7 +6,7 @@ name := "sbt-cassandra-plugin"
 
 description := "SBT plugin to allow launching Cassandra during tests, and test your application against it"
 
-version := "0.6"
+version := "0.6.1"
 
 scalaVersion := "2.10.4"
 
@@ -20,36 +20,34 @@ scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:postf
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-publishTo <<= version { v: String =>
+publishTo := {
   val nexus = "https://oss.sonatype.org/"
-  if (v.trim.endsWith("SNAPSHOT")) Some("snapshots" at nexus + "content/repositories/snapshots")
-  else                             Some("releases" at nexus + "service/local/staging/deploy/maven2")
+  if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
+  else                  Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
 publishMavenStyle := true
 
 publishArtifact in Test := false
 
+publishArtifact in (Compile, packageSrc) :=  true
+
 pomIncludeRepository := { x => false }
 
+homepage := Some(url("http://github.com/hochgi/sbt-cassandra-plugin"))
+
+licenses := Seq("The MIT License (MIT)" -> url("http://opensource.org/licenses/MIT"))
+
 pomExtra := (
-  <url>http://github.com/hochgi/sbt-cassandra-plugin</url>
-  <licenses>
-    <license>
-      <name>The MIT License (MIT)</name>
-      <url>http://opensource.org/licenses/MIT</url>
-      <distribution>repo</distribution>
-    </license>
-  </licenses>
   <scm>
-    <url>git@github.com:kpbochenek/sbt-cassandra-plugin.git</url>
-    <connection>scm:git:git@github.com:kpbochenek/sbt-cassandra-plugin.git</connection>
+    <url>https://github.com/hochgi/sbt-cassandra-plugin.git</url>
+    <connection>scm:git@github.com:hochgi/sbt-cassandra-plugin.git</connection>
   </scm>
   <developers>
     <developer>
       <id>hochgi</id>
-      <name>Thomson Reuters</name>
-      <url>https://github.com/hochgi</url>
-      </developer>
+      <name>Gilad Hoch</name>
+      <url>http://hochgi.blogspot.com</url>
+    </developer>
   </developers>
 )
