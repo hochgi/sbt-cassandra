@@ -49,5 +49,10 @@ pomExtra := (
       <name>Gilad Hoch</name>
       <url>http://hochgi.blogspot.com</url>
     </developer>
+    <developer>
+      <id>milliondreams</id>
+      <name>Rohit Rai</name>
+      <url>http://www.twitter.com/milliondreams</url>
+    </developer>
   </developers>
 )
