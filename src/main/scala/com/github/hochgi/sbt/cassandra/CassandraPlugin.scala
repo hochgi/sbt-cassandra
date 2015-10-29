@@ -12,6 +12,9 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.Try
 
+import java.util.{Map => JMap}
+import scala.collection.JavaConversions._
+
 object CassandraPlugin extends Plugin {
 	
 	//defaults:
@@ -20,7 +23,6 @@ object CassandraPlugin extends Plugin {
 
 	val cassandraVersion = SettingKey[String]("cassandra-version")
 	val cassandraConfigDir = SettingKey[String]("cassandra-config-dir")
-	val cassandraCliInit = SettingKey[String]("cassandra-cli-init")
 	val cassandraCqlInit = SettingKey[String]("cassandra-cql-init")
 	val cassandraHost = SettingKey[String]("cassandra-host")
 	val cassandraPort = SettingKey[String]("cassandra-port")
@@ -40,16 +42,13 @@ object CassandraPlugin extends Plugin {
 	val cassandraTgz = SettingKey[String]("cassandra-tgz")
 
 	val cassandraSettings = Seq(
-    cassandraHost := "localhost",
-    cassandraPort := "9160",
 		configMappings := Seq(),
-		configMappings <++= (cassandraPort,target){
-			case (port, targetDir) => {
+		configMappings <++= (target){
+			case (targetDir) => {
 				val data = targetDir / "data"
 				def d(s: String): String = (data / s).getAbsolutePath
 				Seq(
-					"rpc_port" -> port,
-					"data_file_directories" -> {
+						"data_file_directories" -> {
 						val l = new java.util.LinkedList[String]()
 						l.add(d("data"))
 						l
@@ -72,12 +71,6 @@ object CassandraPlugin extends Plugin {
 			targetDir / s"apache-cassandra-${ver}"
 		},
 		cassandraVersion := "2.1.2",
-		cassandraCqlPort := {
-			val oldPort = cassandraHost.value
-			val ver = cassandraVersion.value
-				if(Version(ver) > Version("2.1.0")) "9042"
-				else oldPort
-		},
 	  cassandraTgz := "",
 		classpathTypes ~=  (_ + "tar.gz"),
 		libraryDependencies += {
@@ -113,7 +106,6 @@ object CassandraPlugin extends Plugin {
 			val targetDir = target.value
 			val cassHome = deployCassandra.value
 			val confDirAsString = cassandraConfigDir.value
-			val cli = cassandraCliInit.value
 			val cql = cassandraCqlInit.value
 			val host = cassandraHost.value
 			val port = cassandraPort.value
@@ -139,7 +131,7 @@ object CassandraPlugin extends Plugin {
 				logger.info("going to wait for cassandra:")
 				waitForCassandra(port, startDeadline, (s: String) => logger.info(s))
 				logger.info("going to initialize cassandra:")
-				initCassandra(cli, cql, classpath, cassHome, host, port, cqlPort)
+				initCassandra(cql, classpath, cassHome, host, cqlPort)
 			} else {
 				logger.warn("cassandra already running")
 			}
@@ -233,7 +225,7 @@ object CassandraPlugin extends Plugin {
     }
   }
 
-	def initCassandra(cql: String, classpath: String, cassHome: File, host: String, port: String, cqlPort: String): Unit = {
+	def initCassandra(cql: String, classpath: String, cassHome: File, host: String, cqlPort: String): Unit = {
 		if(cql != defaultCqlInit) {
 			val bin = cassHome / "bin" / "cqlsh"
 			val cqlPath = new File(cql).getAbsolutePath
