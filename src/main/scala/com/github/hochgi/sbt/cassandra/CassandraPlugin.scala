@@ -16,7 +16,6 @@ object CassandraPlugin extends Plugin {
 	
 	//defaults:
 	private[this] val defaultConfigDir = "NO_DIR_SUPPLIED"
-	private[this] val defaultCliInit = "NO_CLI_COMMANDS_SUPPLIED"
 	private[this] val defaultCqlInit = "NO_CQL_COMMANDS_SUPPLIED"
 
 	val cassandraVersion = SettingKey[String]("cassandra-version")
@@ -63,7 +62,6 @@ object CassandraPlugin extends Plugin {
 	  cassandraJavaArgs := Nil,
 	  cassandraApplicationArgs := Nil,
 		cassandraConfigDir := defaultConfigDir,
-		cassandraCliInit := defaultCliInit,
 		cassandraCqlInit := defaultCqlInit,
 		stopCassandraAfterTests := true,
 		cleanCassandraAfterStop := true,
@@ -235,16 +233,10 @@ object CassandraPlugin extends Plugin {
     }
   }
 
-  def initCassandra(cli: String, cql: String, classpath: String, cassHome: File, host: String, port: String, cqlPort: String): Unit = {
-    if(cli != defaultCliInit && cql != defaultCqlInit) {
-      sys.error("use cli initiation commands, or cql initiation commands, but not both!")
-    } else if(cli != defaultCliInit) {
-      val bin = cassHome / "bin" / "cassandra-cli"
-      val args = Seq(bin.getAbsolutePath, "-f", cli,"-h",host,"-p",port)
-      Process(args,cassHome).!
-    } else if(cql != defaultCqlInit) {
-      val bin = cassHome / "bin" / "cqlsh"
-      val cqlPath = new File(cql).getAbsolutePath
+	def initCassandra(cql: String, classpath: String, cassHome: File, host: String, port: String, cqlPort: String): Unit = {
+		if(cql != defaultCqlInit) {
+			val bin = cassHome / "bin" / "cqlsh"
+			val cqlPath = new File(cql).getAbsolutePath
       val args = Seq(bin.getAbsolutePath, "-f", cqlPath,host,cqlPort)
       Process(args,cassHome).!
     }
