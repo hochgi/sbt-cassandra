@@ -4,9 +4,9 @@ organization := "com.github.hochgi"
 
 name := "sbt-cassandra-plugin"
 
-description := "SBT plugin to allow launching Cassandra during tests, and test your application against it"
+description := "SBT plugin to launch and use Cassandra during integration tests"
 
-version := "0.6.3"
+version := "0.9.0"
 
 scalaVersion := "2.10.6"
 
@@ -17,8 +17,6 @@ libraryDependencies ++= Seq("org.apache.thrift" % "libthrift" % "0.9.2" exclude(
                             "me.lessis" %% "semverfi" % "0.1.3")
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:postfixOps")
-
-net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 publishTo := {
   val nexus = "https://oss.sonatype.org/"
@@ -53,6 +51,11 @@ pomExtra := (
       <id>milliondreams</id>
       <name>Rohit Rai</name>
       <url>http://www.twitter.com/milliondreams</url>
+    </developer>
+    <developer>
+      <id>Shiti</id>
+      <name>Shiti Saxena</name>
+      <url>https://twitter.com/eraoferrors</url>
     </developer>
   </developers>
 )
