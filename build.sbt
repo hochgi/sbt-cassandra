@@ -2,11 +2,11 @@ sbtPlugin := true
 
 organization := "com.github.hochgi"
 
-name := "sbt-cassandra-plugin"
+name := "sbt-cassandra"
 
 description := "SBT plugin to launch and use Cassandra during integration tests"
 
-version := "0.9.0"
+version := "1.0.0"
 
 scalaVersion := "2.10.6"
 
