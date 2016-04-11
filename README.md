@@ -7,7 +7,7 @@ An auto-plugin that launches [Cassandra](http://cassandra.apache.org) during int
 Add the following to your `project/plugins.sbt` file:
 
 ```scala
-addSbtPlugin("com.tuplejump.com.github.hochgi" % "sbt-cassandra"   % "1.0.0")
+addSbtPlugin("com.tuplejump.com.github.hochgi" % "sbt-cassandra"   % "1.0.1")
 ```
 
 ## Usage ##
