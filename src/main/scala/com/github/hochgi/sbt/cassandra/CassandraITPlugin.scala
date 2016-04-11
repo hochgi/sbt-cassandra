@@ -189,6 +189,7 @@ object CassandraITPlugin extends AutoPlugin {
   import autoImport._
 
   lazy val cassandraITDefaultSettings: Seq[Def.Setting[_]] = Seq(
+    cassandraVersion:="",
     cassandraConfigDir := "",
     cassandraCqlInit := "",
     cassandraTgz := "",
