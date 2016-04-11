@@ -44,14 +44,17 @@ object CassandraITPlugin extends AutoPlugin {
                       casVersion: String,
                       targetDir: File,
                       logger: Logger): File = {
-    val source = s"http://archive.apache.org/dist/cassandra/$casVersion/apache-cassandra-$casVersion-bin.tar.gz"
     val cassandraTarGz: File = if (tarFile.trim.nonEmpty) {
       file(tarFile)
-    } else {
+    } else if (casVersion.trim.nonEmpty) {
       val file: File = new File(targetDir, s"apache-cassandra-$casVersion-bin.tar.gz")
+      val source = s"http://archive.apache.org/dist/cassandra/$casVersion/apache-cassandra-$casVersion-bin.tar.gz"
       IO.download(url(source), file)
       file
+    } else {
+      sys.error("Specify Cassandra version or path to Cassandra tar.gz file")
     }
+
     if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
     logger.info(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
     Process(Seq("tar", "-xzf", cassandraTarGz.getAbsolutePath), targetDir).!
