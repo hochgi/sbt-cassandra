@@ -6,7 +6,7 @@ name := "sbt-cassandra"
 
 description := "SBT plugin to launch and use Cassandra during integration tests"
 
-version := "1.0.2"
+version := "1.0.3"
 
 scalaVersion := "2.10.6"
 

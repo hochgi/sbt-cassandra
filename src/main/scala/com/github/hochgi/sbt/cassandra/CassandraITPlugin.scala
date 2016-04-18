@@ -44,9 +44,9 @@ object CassandraITPlugin extends AutoPlugin {
                       casVersion: String,
                       targetDir: File,
                       logger: Logger): File = {
-    val cassandraTarGz: File = if (tarFile.trim.nonEmpty) {
+    val cassandraTarGz: File = if (tarFile.nonEmpty) {
       file(tarFile)
-    } else if (casVersion.trim.nonEmpty) {
+    } else if (casVersion.nonEmpty) {
       val file: File = new File(targetDir, s"apache-cassandra-$casVersion-bin.tar.gz")
       val source = s"http://archive.apache.org/dist/cassandra/$casVersion/apache-cassandra-$casVersion-bin.tar.gz"
       IO.download(url(source), file)
@@ -57,8 +57,11 @@ object CassandraITPlugin extends AutoPlugin {
 
     if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
     logger.info(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
+    val fileName: String = cassandraTarGz.getName
+    val extensionIndex = fileName.indexOf(".tar.gz")
+    val dirName = fileName.substring(0, extensionIndex)
     Process(Seq("tar", "-xzf", cassandraTarGz.getAbsolutePath), targetDir).!
-    val cassHome = targetDir / s"apache-cassandra-$casVersion"
+    val cassHome = targetDir / dirName
     //old cassandra versions used log4j, newer versions use logback and are configurable through env vars
     val oldLogging = cassHome / "conf" / "log4j-server.properties"
     if (oldLogging.exists) {
@@ -189,7 +192,7 @@ object CassandraITPlugin extends AutoPlugin {
   import autoImport._
 
   lazy val cassandraITDefaultSettings: Seq[Def.Setting[_]] = Seq(
-    cassandraVersion:="",
+    cassandraVersion := "",
     cassandraConfigDir := "",
     cassandraCqlInit := "",
     cassandraTgz := "",
@@ -208,7 +211,8 @@ object CassandraITPlugin extends AutoPlugin {
       val targetDir = target.value
       val logger = streams.value.log
 
-      val cassHome = deployCassandra(cassandraTgz.value, cassandraVersion.value, targetDir, logger)
+      val cassHome = deployCassandra(cassandraTgz.value.trim,
+        cassandraVersion.value.trim, targetDir, logger)
 
       val confDir: String = {
         if (cassandraConfigDir.value.trim.isEmpty) {
