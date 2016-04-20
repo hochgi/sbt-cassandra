@@ -2,12 +2,13 @@ sbt-cassandra
 ==============
 
 An auto-plugin that launches [Cassandra](http://cassandra.apache.org) during integration tests.
+Note: The plugin does not work on WindowsOS
 
 ## Installation ##
 Add the following to your `project/plugins.sbt` file:
 
 ```scala
-addSbtPlugin("com.tuplejump.com.github.hochgi" % "sbt-cassandra"   % "1.0.2")
+addSbtPlugin("com.tuplejump.com.github.hochgi" % "sbt-cassandra"   % "1.0.4")
 ```
 
 ## Usage ##
@@ -17,6 +18,8 @@ In `build.sbt`, enable the plugin for desired project and specify the version of
 ```scala
 lazy val root = (project in file("."))
   .enablePlugins(CassandraITPlugin)
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings: _*)
   .settings(cassandraVersion := "3.4")
 ```
 

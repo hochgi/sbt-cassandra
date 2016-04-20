@@ -57,10 +57,9 @@ object CassandraITPlugin extends AutoPlugin {
 
     if (cassandraTarGz == null) sys.error("could not load: cassandra tar.gz file.")
     logger.info(s"cassandraTarGz: ${cassandraTarGz.getAbsolutePath}")
-    val fileName: String = cassandraTarGz.getName
-    val extensionIndex = fileName.indexOf(".tar.gz")
-    val dirName = fileName.substring(0, extensionIndex)
-    Process(Seq("tar", "-xzf", cassandraTarGz.getAbsolutePath), targetDir).!
+    val dirName = "cassandraForIT"
+    Process(Seq("mkdir", "-p", dirName), targetDir).!
+    Process(Seq("tar", "-xzf", cassandraTarGz.getAbsolutePath, "-C", dirName,"--strip-components=1"), targetDir).!
     val cassHome = targetDir / dirName
     //old cassandra versions used log4j, newer versions use logback and are configurable through env vars
     val oldLogging = cassHome / "conf" / "log4j-server.properties"
