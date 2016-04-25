@@ -8,7 +8,7 @@ Note: The plugin does not work on WindowsOS
 Add the following to your `project/plugins.sbt` file:
 
 ```scala
-addSbtPlugin("com.tuplejump.com.github.hochgi" % "sbt-cassandra"   % "1.0.4")
+addSbtPlugin("com.github.hochgi" % "sbt-cassandra"   % "1.0.4")
 ```
 
 ## Usage ##
