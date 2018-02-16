@@ -24,7 +24,7 @@ publishTo := {
   else                  Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
-publishMavenStyle := true
+publishMavenStyle := false
 
 publishArtifact in Test := false
 
