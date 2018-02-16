@@ -6,19 +6,17 @@ name := "sbt-cassandra-plugin"
 
 description := "SBT plugin to allow launching Cassandra during tests, and test your application against it"
 
-version := "0.6.2"
+version := "0.9.0"
 
-scalaVersion := "2.10.6"
+scalaVersion := "2.12.4"
 
 libraryDependencies ++= Seq("org.apache.thrift" % "libthrift" % "0.9.2" exclude("commons-logging","commons-logging"),
                             "org.slf4j" % "slf4j-api" % "1.7.12",
                             "org.slf4j" % "jcl-over-slf4j" % "1.7.12",
                             "org.yaml" % "snakeyaml" % "1.15",
-                            "me.lessis" %% "semverfi" % "0.1.3")
+                            "net.leibman" %% "semverfi" % "0.2.0")
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:postfixOps")
-
-net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 publishTo := {
   val nexus = "https://oss.sonatype.org/"
@@ -40,14 +38,14 @@ licenses := Seq("The MIT License (MIT)" -> url("http://opensource.org/licenses/M
 
 pomExtra := (
   <scm>
-    <url>https://github.com/hochgi/sbt-cassandra-plugin.git</url>
-    <connection>scm:git@github.com:hochgi/sbt-cassandra-plugin.git</connection>
+    <url>https://github.com/hochgi/sbt-cassandra.git</url>
+    <connection>scm:git@github.com:hochgi/sbt-cassandra.git</connection>
   </scm>
   <developers>
     <developer>
       <id>hochgi</id>
       <name>Gilad Hoch</name>
-      <url>http://hochgi.blogspot.com</url>
+      <url>http://blog.hochgi.com</url>
     </developer>
   </developers>
 )

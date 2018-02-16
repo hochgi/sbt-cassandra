@@ -8,56 +8,63 @@ import sbt.Keys._
 import sbt._
 import semverfi._
 
+import scala.sys.process._
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.Try
 
-object CassandraPlugin extends Plugin {
+object CassandraPlugin extends AutoPlugin {
 	
 	//defaults:
 	private[this] val defaultConfigDir = "NO_DIR_SUPPLIED"
 	private[this] val defaultCliInit = "NO_CLI_COMMANDS_SUPPLIED"
 	private[this] val defaultCqlInit = "NO_CQL_COMMANDS_SUPPLIED"
 
-	val cassandraVersion = SettingKey[String]("cassandra-version")
-	val cassandraConfigDir = SettingKey[String]("cassandra-config-dir")
-	val cassandraCliInit = SettingKey[String]("cassandra-cli-init")
-	val cassandraCqlInit = SettingKey[String]("cassandra-cql-init")
-	val cassandraHost = SettingKey[String]("cassandra-host")
-	val cassandraPort = SettingKey[String]("cassandra-port")
-	val cassandraCqlPort = SettingKey[String]("cassandra-cql-port")
-	val stopCassandraAfterTests = SettingKey[Boolean]("stop-cassandra-after-tests")
-	val cleanCassandraAfterStop = SettingKey[Boolean]("stop-cassandra-after-tests")
-	val configMappings = SettingKey[Seq[(String,java.lang.Object)]]("cassandra-conf", "used to override values in conf/cassandra.yaml. values are appropriate java objects")
-	val cassandraJavaArgs = SettingKey[Seq[String]]("cassandra-java-args")
-	val cassandraApplicationArgs = SettingKey[Seq[String]]("cassandra-application-args")
+	object autoImport {
+		val cassandraVersion = SettingKey[String]("cassandra-version")
+		val cassandraConfigDir = SettingKey[String]("cassandra-config-dir")
+		val cassandraCliInit = SettingKey[String]("cassandra-cli-init")
+		val cassandraCqlInit = SettingKey[String]("cassandra-cql-init")
+		val cassandraHost = SettingKey[String]("cassandra-host")
+		val cassandraPort = SettingKey[String]("cassandra-port")
+		val cassandraCqlPort = SettingKey[String]("cassandra-cql-port")
+		val stopCassandraAfterTests = SettingKey[Boolean]("stop-cassandra-after-tests")
+		val cleanCassandraAfterStop = SettingKey[Boolean]("stop-cassandra-after-tests")
+		val configMappings = SettingKey[Seq[(String, java.lang.Object)]]("cassandra-conf", "used to override values in conf/cassandra.yaml. values are appropriate java objects")
+		val cassandraJavaArgs = SettingKey[Seq[String]]("cassandra-java-args")
+		val cassandraApplicationArgs = SettingKey[Seq[String]]("cassandra-application-args")
 
-	val cassandraHome = TaskKey[File]("cassandra-home")
-	val cassandraStartDeadline = TaskKey[Int]("cassandra-start-deadline")
-	val deployCassandra = TaskKey[File]("deploy-cassandra")
-	val startCassandra = TaskKey[String]("start-cassandra")
-	val cassandraPid = TaskKey[String]("cassandra-pid")
-	val stopCassandra = TaskKey[Unit]("stop-cassandra")
-	
-	val cassandraSettings = Seq(
+		val cassandraHome = TaskKey[File]("cassandra-home")
+		val cassandraStartDeadline = TaskKey[Int]("cassandra-start-deadline")
+		val deployCassandra = TaskKey[File]("deploy-cassandra")
+		val startCassandra = TaskKey[String]("start-cassandra")
+		val cassandraPid = TaskKey[String]("cassandra-pid")
+		val stopCassandra = TaskKey[Unit]("stop-cassandra")
+	}
+
+	import autoImport._
+
+	override def projectSettings = Seq(
     cassandraHost := "localhost",
     cassandraPort := "9160",
 		configMappings := Seq(),
-		configMappings <++= (cassandraPort,target){
-			case (port, targetDir) => {
-				val data = targetDir / "data"
-				def d(s: String): String = (data / s).getAbsolutePath
-				Seq(
-					"rpc_port" -> port,
-					"data_file_directories" -> {
-						val l = new java.util.LinkedList[String]()
-						l.add(d("data"))
-						l
-					},
-					"commitlog_directory" -> d("commitlog"),
-					"saved_caches_directory" -> d("saved_caches")
-				)
-			}
+		configMappings ++= {
+			val port = cassandraPort.value
+			val targetDir = target.value
+			val data = targetDir / "data"
+
+			def d(s: String): String = (data / s).getAbsolutePath
+
+			Seq(
+				"rpc_port" -> port,
+				"data_file_directories" -> {
+					val l = new java.util.LinkedList[String]()
+					l.add(d("data"))
+					l
+				},
+				"commitlog_directory" -> d("commitlog"),
+				"saved_caches_directory" -> d("saved_caches")
+			)
 		},
 	  cassandraJavaArgs := Nil,
 	  cassandraApplicationArgs := Nil,
@@ -72,7 +79,7 @@ object CassandraPlugin extends Plugin {
 			val targetDir = target.value
 			targetDir / s"apache-cassandra-${ver}"
 		},
-		cassandraVersion := "2.1.2",
+		cassandraVersion := "2.1.19",
 		cassandraCqlPort := {
 			val oldPort = cassandraHost.value
 			val ver = cassandraVersion.value
@@ -108,6 +115,8 @@ object CassandraPlugin extends Plugin {
 			cassHome
 		},
 		startCassandra := {
+			//if compilation of test classes fails, cassandra should not be invoked. (moreover, Test.Cleanup won't execute to stop it...)
+			(compile in Test).value
 			val javaArgs = cassandraJavaArgs.value
 			val appArgs = cassandraApplicationArgs.value
 			val targetDir = target.value
@@ -147,8 +156,6 @@ object CassandraPlugin extends Plugin {
 			cassandraPid := pid
 			pid
 		},
-		//if compilation of test classes fails, cassandra should not be invoked. (moreover, Test.Cleanup won't execute to stop it...)
-		startCassandra <<= startCassandra.dependsOn(compile in Test),
 		cassandraPid := {
 			val cassPid = target.value / "cass.pid"
 			if(cassPid.exists) sbt.IO.read(cassPid).filterNot(_.isWhitespace)
@@ -161,8 +168,12 @@ object CassandraPlugin extends Plugin {
       stopCassandraMethod(clean, targetDir/ "data", pid)
     },
 		//make sure to Stop cassandra when tests are done.
-		testOptions in Test <+= (cassandraPid, stopCassandraAfterTests, cleanCassandraAfterStop, target) map {
-			case (pid, stop, clean, targetDir) => Tests.Cleanup(() => {
+		testOptions in Test += {
+			val pid = cassandraPid.value
+			val stop = stopCassandraAfterTests.value
+			val clean = cleanCassandraAfterStop.value
+			val targetDir = target.value
+			Tests.Cleanup(() => {
 				if(stop) stopCassandraMethod(clean, targetDir / "data", pid)
 			})
 		}
