@@ -4,17 +4,17 @@ organization := "com.github.hochgi"
 
 name := "sbt-cassandra"
 
-description := "SBT plugin to launch and use Cassandra during integration tests"
+description := "SBT plugin to allow launching Cassandra during tests, and test your application against it"
 
-version := "1.0.4"
+version := "0.9.0"
 
-scalaVersion := "2.10.6"
+scalaVersion := "2.12.4"
 
 libraryDependencies ++= Seq("org.apache.thrift" % "libthrift" % "0.9.2" exclude("commons-logging","commons-logging"),
-                            "org.slf4j" % "slf4j-api" % "1.7.12",
-                            "org.slf4j" % "jcl-over-slf4j" % "1.7.12",
+                            "org.slf4j" % "slf4j-api" % "1.7.25",
+                            "org.slf4j" % "jcl-over-slf4j" % "1.7.25",
                             "org.yaml" % "snakeyaml" % "1.15",
-                            "me.lessis" %% "semverfi" % "0.1.3")
+                            "net.leibman" %% "semverfi" % "0.2.0")
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:postfixOps")
 
@@ -38,24 +38,26 @@ licenses := Seq("The MIT License (MIT)" -> url("http://opensource.org/licenses/M
 
 pomExtra := (
   <scm>
-    <url>https://github.com/hochgi/sbt-cassandra-plugin.git</url>
-    <connection>scm:git@github.com:hochgi/sbt-cassandra-plugin.git</connection>
+    <url>https://github.com/hochgi/sbt-cassandra.git</url>
+    <connection>scm:git@github.com:hochgi/sbt-cassandra.git</connection>
   </scm>
   <developers>
     <developer>
       <id>hochgi</id>
       <name>Gilad Hoch</name>
-      <url>http://hochgi.blogspot.com</url>
+      <url>http://blog.hochgi.com</url>
     </developer>
-    <developer>
+  </developers>
+  <contributors>
+    <contributor>
       <id>milliondreams</id>
       <name>Rohit Rai</name>
       <url>http://www.twitter.com/milliondreams</url>
-    </developer>
-    <developer>
+    </contributor>
+    <contributor>
       <id>Shiti</id>
       <name>Shiti Saxena</name>
       <url>https://twitter.com/eraoferrors</url>
-    </developer>
-  </developers>
+    </contributor>
+  </contributors>
 )
