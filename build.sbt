@@ -50,12 +50,10 @@ pomExtra := (
   </developers>
   <contributors>
     <contributor>
-      <id>milliondreams</id>
       <name>Rohit Rai</name>
       <url>http://www.twitter.com/milliondreams</url>
     </contributor>
     <contributor>
-      <id>Shiti</id>
       <name>Shiti Saxena</name>
       <url>https://twitter.com/eraoferrors</url>
     </contributor>
