@@ -6,14 +6,14 @@ name := "sbt-cassandra"
 
 description := "SBT plugin to allow launching Cassandra during tests, and test your application against it"
 
-version := "0.9.0"
+version := "0.9.1"
 
 scalaVersion := "2.12.4"
 
-libraryDependencies ++= Seq("org.apache.thrift" % "libthrift" % "0.9.2" exclude("commons-logging","commons-logging"),
+libraryDependencies ++= Seq("org.apache.thrift" % "libthrift" % "0.11.0" exclude("commons-logging","commons-logging"),
                             "org.slf4j" % "slf4j-api" % "1.7.25",
                             "org.slf4j" % "jcl-over-slf4j" % "1.7.25",
-                            "org.yaml" % "snakeyaml" % "1.15",
+                            "org.yaml" % "snakeyaml" % "1.19",
                             "net.leibman" %% "semverfi" % "0.2.0")
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:postfixOps")
@@ -24,7 +24,7 @@ publishTo := {
   else                  Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
-publishMavenStyle := false
+publishMavenStyle := true
 
 publishArtifact in Test := false
 
